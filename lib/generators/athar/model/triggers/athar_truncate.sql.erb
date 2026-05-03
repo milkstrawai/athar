@@ -1,0 +1,8 @@
+CREATE TRIGGER "<%= truncate_trigger_name %>"
+AFTER TRUNCATE ON "<%= schema_name %>"."<%= table_name %>"
+FOR EACH STATEMENT
+WHEN (coalesce(current_setting('athar.disabled', true), '') <> 'on')
+EXECUTE PROCEDURE athar_capture_truncate(
+  '<%= schema_name %>',
+  '<%= table_name %>'
+);

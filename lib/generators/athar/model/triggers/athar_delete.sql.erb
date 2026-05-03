@@ -1,0 +1,14 @@
+CREATE TRIGGER "<%= trigger_name %>"
+BEFORE DELETE ON "<%= schema_name %>"."<%= table_name %>"
+FOR EACH ROW
+WHEN (coalesce(current_setting('athar.disabled', true), '') <> 'on')
+EXECUTE PROCEDURE athar_capture_delete(
+  '<%= record_type %>',
+  '<%= schema_name %>',
+  '<%= table_name %>',
+  '<%= primary_key %>',
+  '<%= id_type %>',
+  <%= record_type_column_arg %>,
+  '<%= capture_mode %>',
+  <%= columns_arg %>
+);
