@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#MISE description="Run the Rails single-record deletion benchmark"
+
+set -euo pipefail
+
+source "$(dirname "$0")/../../support/postgres.sh"
+
+mise run deps:ruby
+
+with_postgres
+ensure_database athar_single_bench
+
+ATHAR_DB_NAME=athar_single_bench bundle exec ruby bench/rails_single_delete_bench.rb

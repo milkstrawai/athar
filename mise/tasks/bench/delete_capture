@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#MISE description="Run the SQL-level delete capture benchmark"
+
+set -euo pipefail
+
+source "$(dirname "$0")/../../support/postgres.sh"
+
+mise run deps:ruby
+
+with_postgres
+ensure_database athar_bench
+
+ATHAR_DB_NAME=athar_bench bundle exec ruby bench/delete_capture_bench.rb
