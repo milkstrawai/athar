@@ -1,0 +1,29 @@
+class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+<% if remove? -%>
+  def up
+    drop_trigger :<%= trigger_name %>, on: <%= fx_on_argument %>
+<% if track_truncate? -%>
+    drop_trigger :<%= truncate_trigger_name %>, on: <%= fx_on_argument %>
+<% end -%>
+  end
+
+  def down
+    raise ActiveRecord::IrreversibleMigration
+  end
+<% else -%>
+  def change
+<% trigger_descriptors.each do |t| -%>
+<% if t[:previous_version].nil? -%>
+    create_trigger :<%= t[:name] %>, on: <%= fx_on_argument %>, version: <%= t[:version] %>
+<% elsif t[:unchanged] -%>
+    # <%= t[:name] %> is already at version <%= t[:version] %>; nothing to do.
+<% else -%>
+    update_trigger :<%= t[:name] %>,
+      on: <%= fx_on_argument %>,
+      version: <%= t[:version] %>,
+      revert_to_version: <%= t[:previous_version] %>
+<% end -%>
+<% end -%>
+  end
+<% end -%>
+end

@@ -1,0 +1,47 @@
+class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+<% if remove? -%>
+  def up
+    execute(<<~SQL)
+<%= indent_sql(drop_trigger_sql, 6) %>
+    SQL
+  end
+
+  def down
+    raise ActiveRecord::IrreversibleMigration
+  end
+<% elsif update? -%>
+  def up
+    execute(<<~SQL)
+<%= indent_sql(drop_trigger_sql, 6) %>
+
+<%= indent_sql(trigger_sql, 6) %>
+<% if track_truncate? -%>
+
+<%= indent_sql(truncate_trigger_sql, 6) %>
+<% end -%>
+    SQL
+  end
+
+  def down
+    raise ActiveRecord::IrreversibleMigration
+  end
+<% else -%>
+  def up
+    execute(<<~SQL)
+<%= indent_sql(drop_trigger_sql, 6) %>
+
+<%= indent_sql(trigger_sql, 6) %>
+<% if track_truncate? -%>
+
+<%= indent_sql(truncate_trigger_sql, 6) %>
+<% end -%>
+    SQL
+  end
+
+  def down
+    execute(<<~SQL)
+<%= indent_sql(drop_trigger_sql, 6) %>
+    SQL
+  end
+<% end -%>
+end
