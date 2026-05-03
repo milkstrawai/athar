@@ -1,0 +1,51 @@
+-- Athar capture truncate trigger function (v1).
+-- Statement-level AFTER TRUNCATE trigger.
+-- Args:
+--   TG_ARGV[0] schema_name (e.g. 'public')
+--   TG_ARGV[1] table_name  (e.g. 'users')
+
+CREATE OR REPLACE FUNCTION athar_capture_truncate()
+RETURNS trigger AS $$
+DECLARE
+  arg_schema_name text;
+  arg_table_name text;
+
+  meta jsonb;
+  meta_text text;
+  actor_id_text text;
+BEGIN
+  arg_schema_name := NULLIF(TG_ARGV[0], 'null');
+  arg_table_name := NULLIF(TG_ARGV[1], 'null');
+
+  meta := '{}'::jsonb;
+  meta_text := current_setting('athar.meta', true);
+  IF coalesce(meta_text, '') <> '' THEN
+    meta := meta_text::jsonb;
+  END IF;
+
+  actor_id_text := meta ->> 'actor_id';
+
+  INSERT INTO athar_table_events (
+    event_type,
+    schema_name,
+    table_name,
+    actor_type,
+    actor_id,
+    metadata,
+    occurred_at,
+    created_at
+  )
+  VALUES (
+    'truncate',
+    arg_schema_name,
+    arg_table_name,
+    meta ->> 'actor_type',
+    CASE WHEN actor_id_text IS NULL THEN NULL ELSE actor_id_text::<%= foreign_key_type %> END,
+    meta - 'actor_type' - 'actor_id',
+    statement_timestamp(),
+    statement_timestamp()
+  );
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
