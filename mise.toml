@@ -1,0 +1,4 @@
+min_version = "2026.4.10"
+
+[tools]
+ruby = "4.0.3"

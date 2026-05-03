@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    ports:
+      - "${ATHAR_DB_PORT:-5434}:5432"
+    volumes:
+      - postgres-18-cluster:/var/lib/postgresql
+    environment:
+      POSTGRES_DB: athar_test
+      POSTGRES_USER: "${ATHAR_DB_USER:-athar}"
+      POSTGRES_PASSWORD: "${ATHAR_DB_PASSWORD:-athar}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-18-cluster:

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#MISE description="Run the full test suite in Fx and raw-SQL modes"
+
+set -euo pipefail
+
+source "$(dirname "$0")/../support/postgres.sh"
+
+mise run deps:ruby
+
+with_postgres
+ensure_database athar_test
+ensure_database athar_no_fx_test
+ensure_database athar_uuid_test
+
+bundle exec rake test
+ATHAR_NO_FX=1 bundle exec rake test

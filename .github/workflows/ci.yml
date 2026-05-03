@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    name: RuboCop
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          rubygems: latest
+          bundler-cache: true
+      - run: bundle exec rubocop --no-server
+
+  test:
+    name: ${{ matrix.gemfile }} / Ruby ${{ matrix.ruby }} / PG ${{ matrix.postgres }} / ${{ matrix.fx_mode }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["3.2", "3.3", "3.4", "4.0"]
+        gemfile:
+          - rails_7_2
+          - rails_8_0
+          - rails_8_1
+        fx_mode: ["fx", "no_fx"]
+        postgres: ["18"]
+        exclude:
+          # Rails 7.2 and 8.0 do not support Ruby 4.0.
+          - ruby: "4.0"
+            gemfile: rails_7_2
+          - ruby: "4.0"
+            gemfile: rails_8_0
+        include:
+          # Spot-check on the oldest supported PostgreSQL.
+          - ruby: "3.4"
+            gemfile: rails_8_1
+            fx_mode: fx
+            postgres: "13"
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: athar
+          POSTGRES_DB: athar_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/${{ matrix.gemfile }}.gemfile
+      ATHAR_DB_HOST: localhost
+      ATHAR_DB_PORT: 5432
+      ATHAR_DB_USER: athar
+      ATHAR_DB_PASSWORD: ""
+      ATHAR_DB_NAME: athar_test
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          rubygems: latest
+          bundler-cache: true
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc |
+            sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc > /dev/null
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" |
+            sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-${{ matrix.postgres }}
+          echo "/usr/lib/postgresql/${{ matrix.postgres }}/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/${{ matrix.postgres }}/bin/pg_dump --version
+
+      - name: Create UUID test database
+        run: |
+          PGPASSWORD= psql -h localhost -p 5432 -U athar -d postgres \
+            -c "CREATE DATABASE athar_uuid_test"
+
+      - name: Create no-fx test database
+        if: matrix.fx_mode == 'no_fx'
+        run: |
+          PGPASSWORD= psql -h localhost -p 5432 -U athar -d postgres \
+            -c "CREATE DATABASE athar_no_fx_test"
+
+      - name: Run tests
+        env:
+          ATHAR_NO_FX: ${{ matrix.fx_mode == 'no_fx' && '1' || '' }}
+        run: bundle exec rake test
+
+      - name: Archive Rails logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: logs-${{ matrix.gemfile }}-ruby${{ matrix.ruby }}-pg${{ matrix.postgres }}-${{ matrix.fx_mode }}
+          path: |
+            test/dummy/log
+            test/dummy/db/migrate
+            test/dummy/db/functions
+            test/dummy/db/triggers
