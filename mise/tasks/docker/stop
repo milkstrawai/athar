@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Stop PostgreSQL for local development"
+
+set -euo pipefail
+
+source "$(dirname "$0")/../../support/postgres.sh"
+
+docker_stop

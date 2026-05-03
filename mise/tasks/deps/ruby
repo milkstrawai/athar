@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Install Ruby gems"
+
+set -euo pipefail
+
+bundle check || bundle install

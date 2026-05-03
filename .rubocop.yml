@@ -1,0 +1,34 @@
+plugins:
+  - rubocop-rake
+  - rubocop-minitest
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  Exclude:
+    - "test/tmp/**/*"
+    - "test/dummy/db/**/*"
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+Style/Documentation:
+  Enabled: false
+
+Metrics/BlockLength:
+  CountAsOne: ["array", "hash", "heredoc", "method_call"]
+
+Metrics/ClassLength:
+  CountAsOne: ["array", "hash", "heredoc", "method_call"]
+
+Metrics/ModuleLength:
+  CountAsOne: ["array", "hash", "heredoc", "method_call"]
+
+Metrics/MethodLength:
+  CountAsOne: ["array", "hash", "heredoc", "method_call"]
+
+Minitest/MultipleAssertions:
+  Enabled: false
