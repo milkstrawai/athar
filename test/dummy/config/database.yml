@@ -1,0 +1,12 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  host: <%= ENV.fetch("ATHAR_DB_HOST", "localhost") %>
+  port: <%= ENV.fetch("ATHAR_DB_PORT", "5434") %>
+  username: <%= ENV.fetch("ATHAR_DB_USER", "athar") %>
+  password: <%= ENV.fetch("ATHAR_DB_PASSWORD", "athar") %>
+
+test:
+  <<: *default
+  database: <%= ENV.fetch("ATHAR_DB_NAME", ENV["ATHAR_NO_FX"] == "1" ? "athar_no_fx_test" : "athar_test") %>
