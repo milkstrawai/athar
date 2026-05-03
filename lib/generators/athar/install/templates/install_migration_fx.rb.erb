@@ -1,0 +1,73 @@
+class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+  def change
+<% unless update? -%>
+    primary_key_type, foreign_key_type = athar_primary_and_foreign_key_types
+
+    create_table :athar_deletions, id: primary_key_type do |t|
+      t.references :record,
+        polymorphic: true,
+        null: false,
+        type: foreign_key_type,
+        index: {name: "index_athar_deletions_on_record"}
+
+      t.references :actor,
+        polymorphic: true,
+        type: foreign_key_type,
+        index: {name: "index_athar_deletions_on_actor"}
+
+      t.string :schema_name
+      t.string :table_name, null: false
+      t.datetime :deleted_at, null: false
+      t.datetime :created_at, null: false
+
+      t.jsonb :record_data, null: false, default: {}
+      t.jsonb :metadata, null: false, default: {}
+    end
+
+    add_index :athar_deletions, [:deleted_at, :id]
+    add_index :athar_deletions, [:table_name, :deleted_at]
+    add_index :athar_deletions, [:schema_name, :table_name, :record_id],
+      name: "index_athar_deletions_on_record_lookup"
+
+    create_table :athar_table_events, id: primary_key_type do |t|
+      t.string :event_type, null: false
+      t.string :schema_name
+      t.string :table_name, null: false
+      t.references :actor,
+        polymorphic: true,
+        type: foreign_key_type,
+        index: {name: "index_athar_table_events_on_actor"}
+      t.jsonb :metadata, null: false, default: {}
+      t.datetime :occurred_at, null: false
+      t.datetime :created_at, null: false
+    end
+
+    add_index :athar_table_events, [:event_type, :table_name, :occurred_at],
+      name: "index_athar_table_events_on_type_table_time"
+    add_index :athar_table_events, :occurred_at
+<% end -%>
+
+<% function_definitions.each do |function_definition| -%>
+<% if function_definition[:previous_version].nil? -%>
+    create_function :<%= function_definition[:name] %>, version: <%= function_definition[:version] %>
+<% elsif function_definition[:previous_version] == function_definition[:version] -%>
+    # <%= function_definition[:name] %> is already at version <%= function_definition[:version] %>; nothing to do.
+<% else -%>
+    update_function :<%= function_definition[:name] %>,
+      version: <%= function_definition[:version] %>,
+      revert_to_version: <%= function_definition[:previous_version] %>
+<% end -%>
+<% end -%>
+  end
+
+  private
+
+  def athar_primary_and_foreign_key_types
+    generators_config = Rails.configuration.generators
+    orm = generators_config.orm
+    setting = generators_config.options[orm][:primary_key_type]
+    primary_key_type = setting || :primary_key
+    foreign_key_type = setting || :bigint
+    [primary_key_type, foreign_key_type]
+  end
+end
