@@ -6,6 +6,28 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-05
+
+### Added
+
+- Data masking for `athar_deletions.record_data`.
+  - Built-in masks: `:email`, `:partial:N:M`, `:hash`.
+  - New `athar:mask` generator for named regex masks.
+  - Custom mask functions via `athar_mask_<name>(jsonb) RETURNS jsonb`.
+  - New `--mask=col:mask_name[:arg...]` flag on `athar:model`.
+- Bumped `athar_capture_delete` to v02 (adds optional 9th trigger argument for masks).
+
+### Upgrade
+
+After bundling, run:
+
+```sh
+bin/rails generate athar:install --update
+bin/rails db:migrate
+```
+
+This installs the new built-in mask functions and bumps `athar_capture_delete`. Existing model triggers continue to work without regeneration; regenerate them only if you want to add masks (`bin/rails generate athar:model X --update --mask=...`).
+
 ## [0.1.0] - 2026-05-03
 
 ### Added

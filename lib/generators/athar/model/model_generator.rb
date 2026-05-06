@@ -12,6 +12,7 @@ module Athar
       include FxHelper
 
       ALLOWED_ID_TYPES = %w[bigint integer uuid].freeze
+      BUILTIN_MASKS = %w[email partial hash].freeze
       CAPTURE_MODES = %w[identity only snapshot].freeze
       UNSAFE_COLUMN_REGEX = /[\s,{}"\\']/
       # PostgreSQL unquoted identifier surface: starts with letter or _,
@@ -34,12 +35,14 @@ module Athar
       class_option :track_truncate, type: :boolean, default: false, desc: "Install AFTER TRUNCATE trigger."
       class_option :update, type: :boolean, default: false, desc: "Generate an update migration."
       class_option :remove, type: :boolean, default: false, desc: "Generate a removal migration."
+      class_option :mask, type: :array, default: nil, desc: "Mask spec: col:mask_name[:arg1:arg2],..."
 
       def validate_options!
         validate_capture_mode!
         validate_identifiers!
         validate_id_type!
         validate_columns!
+        validate_masks!
         ensure_raw_sql_supported! unless fx?
       end
 
@@ -113,7 +116,8 @@ module Athar
             id_type:,
             record_type_column_arg:,
             capture_mode:,
-            columns_arg:
+            columns_arg:,
+            masks_arg:
           }
           Athar::SQL.render(template, locals)
         end
@@ -231,6 +235,29 @@ module Athar
           capture_mode == "only" ? "'{#{columns.join(",")}}'" : "'null'"
         end
 
+        def masks_arg
+          return "'null'" if mask_specs.empty?
+
+          literals = mask_specs.map do |spec|
+            pieces = [spec[:column], spec[:mask], *spec[:args]]
+            %("#{pieces.join(":")}")
+          end
+
+          "'{#{literals.join(",")}}'"
+        end
+
+        def mask_specs
+          @mask_specs ||= Array(options[:mask]).flat_map { |item| item.to_s.split(",") }
+                                               .map(&:strip).reject(&:empty?)
+                                               .map { |spec| parse_mask_spec(spec) }
+        end
+
+        def parse_mask_spec(spec)
+          parts = spec.split(":")
+          raise_invalid("Mask spec #{spec.inspect} is missing a mask name") if parts.length < 2
+          { column: parts[0], mask: parts[1], args: parts[2..] || [] }
+        end
+
         def migration_filename
           if remove?
             "athar_remove_#{table_name}_trigger"
@@ -251,7 +278,7 @@ module Athar
         # The `on:` argument passed to Fx's create_trigger / update_trigger /
         # drop_trigger. For the public schema we keep the bare symbol so the
         # generated migration matches the Rails convention. For non-public
-        # schemas we pass a "schema.table" string so DROP TRIGGER … ON … hits
+        # schemas we pass a "schema.table" string so DROP TRIGGER ... ON ... hits
         # the correct relation regardless of search_path.
         def fx_on_argument
           if schema_name == "public"
@@ -334,6 +361,91 @@ module Athar
             raise_invalid("column #{column.inspect} not found on #{table_name}")
           end
         end
+      end
+
+      def validate_masks! # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/MethodLength,Metrics/PerceivedComplexity
+        return if options[:mask].nil? || options[:mask].empty?
+
+        raise_invalid("--mask requires --only or --snapshot") unless options[:only] || options[:snapshot]
+
+        seen_columns = {}
+        mask_specs.each do |spec|
+          column = spec[:column]
+          mask = spec[:mask]
+          args = spec[:args]
+
+          validate_safe_identifier!("column", column)
+          validate_safe_identifier!("mask", mask)
+
+          raise_invalid("Duplicate column #{column.inspect} in --mask") if seen_columns[column]
+          seen_columns[column] = true
+
+          if options[:only] && !columns.include?(column)
+            raise_invalid("Mask references uncaptured column #{column.inspect}; add it to --only or use --snapshot")
+          end
+
+          if options[:snapshot] && !model_class.columns_hash.key?(column)
+            raise_invalid("Mask references unknown column #{column.inspect} on #{table_name}")
+          end
+
+          validate_mask_arity!(mask, args)
+          validate_mask_resolves!(mask)
+        end
+      end
+
+      def validate_mask_arity!(mask, args) # rubocop:disable Metrics/CyclomaticComplexity
+        case mask
+        when "email", "hash"
+          raise_invalid("#{mask} takes no arguments (got #{args.length})") unless args.empty?
+        when "partial"
+          unless args.length == 2 && args.all? { |a| a.match?(/\A\d+\z/) }
+            raise_invalid("partial requires exactly 2 integer args (got #{args.inspect})")
+          end
+        else
+          raise_invalid("#{mask} is a custom mask and takes no arguments (got #{args.inspect})") unless args.empty?
+        end
+      end
+
+      def validate_mask_resolves!(mask)
+        return if BUILTIN_MASKS.include?(mask)
+        return if custom_mask_installed?(mask)
+
+        raise_invalid(
+          "Mask :#{mask} is not installed. Run 'bin/rails g athar:mask #{mask} --regex=...' " \
+          "or install a custom athar_mask_#{mask}(jsonb) function first."
+        )
+      end
+
+      def custom_mask_installed?(mask)
+        custom_mask_file_installed?(mask) || custom_mask_database_installed?(mask)
+      end
+
+      def custom_mask_file_installed?(mask)
+        return false unless fx?
+
+        Dir.glob(File.join(destination_root, "db/functions/athar_mask_#{mask}_v*.sql")).any?
+      end
+
+      def custom_mask_database_installed?(mask)
+        sql = ActiveRecord::Base.sanitize_sql_array([
+                                                      <<~SQL.squish,
+                                                        SELECT 1
+                                                        FROM pg_proc p
+                                                        WHERE p.proname = ?
+                                                          AND p.pronargs = 1
+                                                          AND p.proargtypes[0] = 'jsonb'::regtype
+                                                          AND p.prorettype = 'jsonb'::regtype
+                                                          AND pg_function_is_visible(p.oid)
+                                                        LIMIT 1
+                                                      SQL
+                                                      "athar_mask_#{mask}"
+                                                    ])
+
+        !ActiveRecord::Base.connection.select_value(sql).nil?
+      rescue StandardError
+        # If we can't reach the DB, fall back to false. The trigger install
+        # itself will fail loudly later if the function truly doesn't exist.
+        false
       end
 
       def raise_invalid(message)

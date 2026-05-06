@@ -31,6 +31,7 @@ It does not turn deleted rows into queryable models, and it does not provide ful
 - [The Solution](#the-solution)
 - [Requirements](#requirements)
 - [Installation](#installation)
+- [Upgrading](#upgrading)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
 - [Configuration](#configuration)
@@ -93,6 +94,22 @@ config.active_record.schema_format = :sql
 
 The generators raise a clear error if you pass `--no-fx` while the host app still uses `schema.rb`. They never edit `config/application.rb` for you.
 
+## Upgrading
+
+After upgrading Athar, run the install generator in update mode and migrate:
+
+```sh
+bin/rails generate athar:install --update
+bin/rails db:migrate
+```
+
+This updates Athar's shared PostgreSQL functions without recreating the audit tables. Existing model triggers continue to work; regenerate a model trigger only when you want to change its capture policy, for example to add masks:
+
+```sh
+bin/rails generate athar:model User --update --snapshot --mask=email:email
+bin/rails db:migrate
+```
+
 ## Quick Start
 
 Install capture for a model:
@@ -152,6 +169,83 @@ The model file does not change. Capture policy is owned by the trigger. To chang
 | Full snapshot    | `bin/rails g athar:model User --snapshot` | All row attributes including `id` |
 
 Identity-only is the default and is recommended for high-churn tables. Prefer `--only` for PII-sensitive records over `--snapshot`. `--except` is not supported because it is too easy to accidentally retain new sensitive columns.
+
+### Data Masking
+
+Athar can mask values inside `record_data` before they are stored, so the audit log keeps signal without retaining the original sensitive value:
+
+```sh
+bin/rails generate athar:model User --snapshot --mask=email:email,phone:partial:0:4
+bin/rails db:migrate
+```
+
+```ruby
+User.find(user_id).destroy!
+Athar::Deletion.last.record_data
+# => { "email" => "use***@example.com", "phone" => "********4567", ... }
+```
+
+Three built-in masks are available:
+
+| Spec | Behavior | Example |
+|------|----------|---------|
+| `email` | Keeps the first 3 chars of the local part, then `***@<domain>`. | `user.name@example.com` → `use***@example.com` |
+| `partial:N:M` | Keeps the first `N` and last `M` characters; replaces the middle with `*` (length-preserving). When `N + M ≥ length`, returns all asterisks. | `4111111111111111` with `partial:0:4` → `************1111` |
+| `hash` | Plain SHA-256 hex of the textual form. Deterministic across rows. | `user.name@example.com` → 64 hex chars |
+
+Mask spec format: `column:mask_name[:arg1:arg2]`. Multiple specs are comma-separated. Built-ins each have a fixed arity (`partial` takes two integer args; `email` and `hash` take none). Custom mask functions take no DSL args.
+
+The `--mask` flag requires `--only` or `--snapshot`; identity-only capture has nothing to mask.
+
+#### Named Regex Masks
+
+For per-app patterns where the built-ins do not fit, install a named regex mask:
+
+```sh
+bin/rails generate athar:mask ssn_keep_last4 \
+  --regex='^([0-9]{3})-([0-9]{2})-([0-9]{4})$' \
+  --replacement='XXX-XX-\3'
+bin/rails db:migrate
+```
+
+Reference it from a model:
+
+```sh
+bin/rails generate athar:model User --snapshot --mask=ssn:ssn_keep_last4
+bin/rails db:migrate
+```
+
+`bin/rails generate athar:mask <name> --update --regex=... --replacement=...` regenerates the function. `--remove` drops it (and refuses if any model trigger still references it).
+
+#### Custom Mask Functions
+
+Applications can install any PostgreSQL function with the signature `athar_mask_<name>(value jsonb) RETURNS jsonb` and reference it from `--mask`:
+
+```sql
+CREATE OR REPLACE FUNCTION athar_mask_uae_phone(value jsonb) RETURNS jsonb AS $$
+DECLARE text_value text;
+BEGIN
+  IF value IS NULL OR jsonb_typeof(value) <> 'string' THEN RETURN value; END IF;
+  text_value := value #>> '{}';
+  RETURN to_jsonb(regexp_replace(text_value, '^\+971([0-9]{2})[0-9]+([0-9]{4})$', '+971\1****\2'));
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+```
+
+```sh
+bin/rails generate athar:model User --snapshot --mask=phone:uae_phone
+```
+
+The names `email`, `partial`, and `hash` are reserved and cannot be used by custom or named-regex masks.
+
+#### Privacy and Operational Notes
+
+> [!IMPORTANT]
+> Masking only protects what is stored in `athar_deletions`. It does **not** redact values from the PostgreSQL WAL — logical replication, point-in-time recovery, and `pg_dump` see the original `DELETE` row before the trigger fires.
+
+- `:hash` is unsalted SHA-256. Same input always yields the same digest, which lets analysts correlate deletions across tables but means the audit log is brute-forceable for small input universes (emails, phone numbers, national IDs).
+- Identity columns (`record_id`, `record_type`, `actor_*`, `schema_name`, `table_name`, `deleted_at`) are never masked; they are indexed lookup keys.
+- Mask spec is frozen into the trigger at migration time. There is no runtime override.
 
 ### Generator Options
 
@@ -386,6 +480,14 @@ You generated a trigger for a table whose primary key type does not match the sh
 ### "Audit row missing for `delete_all`"
 
 Confirm the table has an Athar trigger installed, and confirm the delete was not wrapped in `Athar.without_capture`.
+
+### "Function `athar_mask_foo` does not exist"
+
+The function was dropped after the trigger was installed (or `bin/rails generate athar:install --update` was never run after upgrading the gem). Either reinstall the function, run `--update`, or run `bin/rails generate athar:model X --update` to regenerate the trigger without the orphan reference.
+
+### "athar_mask_partial: head and tail must be non-negative"
+
+A trigger was hand-edited or constructed with negative `partial` arguments. The generator validates this at scaffold time, so the runtime check only fires for triggers that bypassed the generator.
 
 ## Development
 

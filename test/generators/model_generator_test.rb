@@ -189,6 +189,113 @@ module Athar
       assert_match(/record_type_column .* not a safe SQL identifier/, error.message)
     end
 
+    # --mask tests
+
+    test "--mask without --only or --snapshot raises" do
+      generator = Athar::Generators::ModelGenerator.new(["User"], mask: ["email:email"])
+      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      assert_match(/--mask requires --only or --snapshot/, error.message)
+    end
+
+    test "--only with --mask referencing uncaptured column raises" do
+      generator = Athar::Generators::ModelGenerator.new(["User"], only: ["name"], mask: ["email:email"])
+      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      assert_match(/uncaptured column/, error.message)
+    end
+
+    test "--snapshot with --mask referencing nonexistent mask function raises" do
+      generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["email:nonexistent"])
+      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      assert_match(/Mask :nonexistent is not installed/, error.message)
+    end
+
+    test "--snapshot with partial mask missing second arg raises" do
+      generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["name:partial:0"])
+      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      assert_match(/partial requires exactly 2 integer args/, error.message)
+    end
+
+    test "--snapshot with partial mask non-numeric arg raises" do
+      generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["name:partial:0:abc"])
+      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      assert_match(/partial requires exactly 2 integer args/, error.message)
+    end
+
+    test "raises when partial called with negative arg" do
+      generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["name:partial:-1:2"])
+      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      assert_match(/partial requires exactly 2 integer args/, error.message)
+    end
+
+    test "raises when a custom mask is given args" do
+      stub_dir = File.join(destination_root, "db/functions")
+      FileUtils.mkdir_p(stub_dir)
+      File.write(File.join(stub_dir, "athar_mask_my_custom_v01.sql"), "-- stub")
+
+      generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["name:my_custom:1:2"])
+      generator.destination_root = destination_root
+      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      assert_match(/custom mask and takes no arguments/, error.message)
+    end
+
+    test "accepts a custom mask function installed in the database" do
+      ActiveRecord::Base.connection.execute(<<~SQL)
+        CREATE OR REPLACE FUNCTION athar_mask_db_custom(value jsonb) RETURNS jsonb AS $$
+        BEGIN
+          RETURN value;
+        END;
+        $$ LANGUAGE plpgsql;
+      SQL
+
+      with_schema_format(:sql) do
+        generator = Athar::Generators::ModelGenerator.new(
+          ["User"],
+          fx: false,
+          snapshot: true,
+          mask: ["name:db_custom"]
+        )
+        generator.destination_root = destination_root
+
+        assert_nothing_raised { generator.send(:validate_options!) }
+      end
+    ensure
+      ActiveRecord::Base.connection.execute("DROP FUNCTION IF EXISTS athar_mask_db_custom(jsonb)")
+    end
+
+    test "--snapshot with email mask with argument raises" do
+      generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["email:email:5"])
+      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      assert_match(/email takes no arguments/, error.message)
+    end
+
+    test "--snapshot with duplicate column in --mask raises" do
+      generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["email:email,email:hash"])
+      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      assert_match(/Duplicate column/, error.message)
+    end
+
+    test "--snapshot with unsafe identifier in mask column name raises" do
+      generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["email;DROP:email"])
+      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      assert_match(/not a safe SQL identifier/, error.message)
+    end
+
+    test "--snapshot with --mask embeds mask spec in trigger SQL" do
+      run_generator ["User", "--snapshot", "--mask=email:email,name:partial:0:4"]
+
+      trigger_sql = File.read(File.join(destination_root, "db/triggers/athar_on_users_v01.sql"))
+
+      assert_match(/'{"email:email","name:partial:0:4"}'/, trigger_sql)
+    end
+
+    test "--snapshot without --mask passes 'null' as masks_arg in trigger SQL" do
+      run_generator ["User", "--snapshot"]
+
+      trigger_sql = File.read(File.join(destination_root, "db/triggers/athar_on_users_v01.sql"))
+
+      assert_match(/'null'/, trigger_sql)
+    end
+
     private
 
     def read_migration(name)

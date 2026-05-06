@@ -215,13 +215,14 @@ module Athar
           end
         end
 
-        def register_model_trigger(model_name, options = {}) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/MethodLength
+        def register_model_trigger(model_name, options = {}) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/MethodLength,Metrics/PerceivedComplexity
           opts = { schema: options[:schema] || "public" }
           opts[:fx] = false unless fx_mode?
           opts[:only] = options[:only] if options[:only]
           opts[:snapshot] = options[:snapshot] if options[:snapshot]
           opts[:track_truncate] = options[:track_truncate] if options[:track_truncate]
           opts[:record_type_column] = options[:record_type_column] if options.key?(:record_type_column)
+          opts[:mask] = Array(options[:mask]) if options[:mask]
 
           generator = Athar::Generators::ModelGenerator.new([model_name], opts)
           generator.destination_root = DUMMY_ROOT

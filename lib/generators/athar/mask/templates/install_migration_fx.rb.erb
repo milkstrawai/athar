@@ -1,0 +1,5 @@
+class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::VERSION::STRING.to_f %>]
+  def change
+    create_function :athar_mask_<%= name %>
+  end
+end
