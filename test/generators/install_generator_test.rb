@@ -31,7 +31,7 @@ module Athar
       assert_path_exists File.join(destination_root, "db/functions/athar_capture_truncate_v01.sql")
     end
 
-    test "update mode emits a function-only migration with update_function" do
+    test "update mode emits a function-only migration when functions are current" do
       run_generator
       run_generator ["--update"]
 
@@ -39,14 +39,11 @@ module Athar
 
       refute_match "create_table :athar_deletions", content
       assert_match(/already at version 1/, content)
+      refute_match "update_function", content
       refute_match "athar_primary_and_foreign_key_types", content
     end
 
-    test "--update emits create_function for new mask built-ins and bumps athar_capture_delete to v2" do
-      # Pre-seed db/functions/ to simulate an app upgrading from the previous release:
-      #   - athar_filter_keys at v01 (unchanged body → should stay at v01, no emission)
-      #   - athar_capture_delete at v01 (old body → body differs → bump to v02)
-      #   - the four new mask functions have no files → new → create_function at v01
+    test "--update creates new mask built-ins and replaces changed functions without dropping dependencies" do
       functions_dir = File.join(destination_root, "db/functions")
       FileUtils.mkdir_p(functions_dir)
 
@@ -59,24 +56,31 @@ module Athar
 
       migration = read_migration("athar_update_functions_v02")
 
-      # The four new mask built-ins must be created at v01.
       assert_match(/create_function :athar_apply_masks/, migration)
       assert_match(/create_function :athar_mask_email/, migration)
       assert_match(/create_function :athar_mask_partial/, migration)
       assert_match(/create_function :athar_mask_hash/, migration)
 
-      # athar_capture_delete must be bumped from v01 → v02.
-      assert_match(/update_function :athar_capture_delete,\s*\n\s*version: 2,\s*\n\s*revert_to_version: 1/, migration)
+      assert_match(/reversible do \|dir\|/, migration)
+      assert_match(/create_function :athar_capture_delete, version: 2/, migration)
+      assert_match(/create_function :athar_capture_delete, version: 1/, migration)
 
-      # athar_filter_keys is unchanged — no create_function or update_function for it.
       refute_match(/create_function :athar_filter_keys/, migration)
-      refute_match(/update_function :athar_filter_keys/, migration)
-
-      # Sanity: must not emit athar_capture_delete version: 3 (it was at v01, not v02).
-      refute_match(/update_function :athar_capture_delete,\s*\n\s*version: 3/, migration)
-
-      # Must not include table DDL — this is a functions-only update migration.
+      refute_match(/update_function/, migration)
+      refute_match(/create_function :athar_capture_delete, version: 3/, migration)
       refute_match "create_table :athar_deletions", migration
+      assert_path_exists File.join(destination_root, "db/functions/athar_capture_delete_v02.sql")
+    end
+
+    test "--no-fx update leaves rollback empty instead of dropping existing functions" do
+      with_schema_format(:sql) do
+        run_generator ["--no-fx", "--update"]
+      end
+
+      migration = read_migration("athar_update_functions_v01")
+
+      assert_match(/def down\s+end/, migration)
+      refute_match "DROP FUNCTION", migration
     end
 
     test "--no-fx with schema_format = :sql embeds raw SQL in migration" do

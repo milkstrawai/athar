@@ -53,9 +53,15 @@ class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Mi
 <% elsif function_definition[:previous_version] == function_definition[:version] -%>
     # <%= function_definition[:name] %> is already at version <%= function_definition[:version] %>; nothing to do.
 <% else -%>
-    update_function :<%= function_definition[:name] %>,
-      version: <%= function_definition[:version] %>,
-      revert_to_version: <%= function_definition[:previous_version] %>
+    reversible do |dir|
+      dir.up do
+        create_function :<%= function_definition[:name] %>, version: <%= function_definition[:version] %>
+      end
+
+      dir.down do
+        create_function :<%= function_definition[:name] %>, version: <%= function_definition[:previous_version] %>
+      end
+    end
 <% end -%>
 <% end -%>
   end

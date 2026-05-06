@@ -60,11 +60,13 @@ class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Mi
     drop_table :athar_deletions if table_exists?(:athar_deletions)
 <% end -%>
 
+<% unless update? -%>
     execute(<<~SQL)
 <% function_drops.each do |drop_sql| -%>
       <%= drop_sql %>
 <% end -%>
     SQL
+<% end -%>
   end
 <% unless update? -%>
   private
