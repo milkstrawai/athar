@@ -12,6 +12,10 @@ module Athar
     STATIC_FUNCTIONS = %w[
       athar_filter_keys
       athar_capture_delete
+      athar_mask_email
+      athar_mask_partial
+      athar_mask_hash
+      athar_apply_masks
     ].freeze
 
     TEMPLATE_FUNCTIONS = %w[
@@ -38,8 +42,10 @@ module Athar
 
       def function_signature(name)
         case name
-        when "athar_filter_keys" then "jsonb, text[]"
+        when "athar_filter_keys", "athar_apply_masks" then "jsonb, text[]"
         when "athar_capture_delete", "athar_capture_truncate" then ""
+        when "athar_mask_email", "athar_mask_hash" then "jsonb"
+        when "athar_mask_partial" then "jsonb, integer, integer"
         else
           raise ArgumentError, "unknown SQL function: #{name.inspect}"
         end

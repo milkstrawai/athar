@@ -1,0 +1,9 @@
+class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::VERSION::STRING.to_f %>]
+  def up
+    execute "DROP FUNCTION IF EXISTS athar_mask_<%= name %>(jsonb)"
+  end
+
+  def down
+    raise ActiveRecord::IrreversibleMigration
+  end
+end

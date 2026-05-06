@@ -1,0 +1,11 @@
+class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::VERSION::STRING.to_f %>]
+  def up
+    execute <<~SQL
+<%= function_body.lines.map { |l| "      #{l}" }.join %>
+    SQL
+  end
+
+  def down
+    raise ActiveRecord::IrreversibleMigration
+  end
+end

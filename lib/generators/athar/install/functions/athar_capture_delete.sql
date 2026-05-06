@@ -8,6 +8,7 @@
 --   TG_ARGV[5] record_type_column ('type' | 'null')
 --   TG_ARGV[6] capture_mode       ('identity' | 'only' | 'snapshot')
 --   TG_ARGV[7] columns            ('{email,name}' or 'null')
+--   TG_ARGV[8] masks              ('{"col:mask_name[:arg1:arg2]"}' or 'null')
 
 CREATE OR REPLACE FUNCTION athar_capture_delete()
 RETURNS trigger AS $$
@@ -20,6 +21,7 @@ DECLARE
   arg_record_type_column text;
   arg_capture_mode text;
   arg_columns text[];
+  arg_masks text[];
 
   full_row jsonb;
   filtered_data jsonb;
@@ -38,6 +40,7 @@ BEGIN
   arg_record_type_column := NULLIF(TG_ARGV[5], 'null');
   arg_capture_mode := NULLIF(TG_ARGV[6], 'null');
   arg_columns := NULLIF(TG_ARGV[7], 'null')::text[];
+  arg_masks := NULLIF(TG_ARGV[8], 'null')::text[];
 
   full_row := to_jsonb(OLD);
 
@@ -56,6 +59,10 @@ BEGIN
     filtered_data := athar_filter_keys(full_row, arg_columns);
   ELSE
     RAISE EXCEPTION 'Unsupported Athar capture mode: %', arg_capture_mode;
+  END IF;
+
+  IF arg_masks IS NOT NULL AND array_length(arg_masks, 1) > 0 THEN
+    filtered_data := athar_apply_masks(filtered_data, arg_masks);
   END IF;
 
   meta := '{}'::jsonb;
