@@ -39,6 +39,7 @@ module Athar
 
       refute_match "create_table :athar_deletions", content
       assert_match(/already at version 1/, content)
+      refute_match "athar_primary_and_foreign_key_types", content
     end
 
     test "--no-fx with schema_format = :sql embeds raw SQL in migration" do
