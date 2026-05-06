@@ -59,7 +59,7 @@ class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Mi
 <% end -%>
 <% end -%>
   end
-
+<% unless update? -%>
   private
 
   def athar_primary_and_foreign_key_types
@@ -70,4 +70,5 @@ class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Mi
     foreign_key_type = setting || :bigint
     [primary_key_type, foreign_key_type]
   end
+<% end -%>
 end

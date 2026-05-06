@@ -39,6 +39,7 @@ module Athar
 
       refute_match "create_table :athar_deletions", content
       assert_match(/already at version 1/, content)
+      refute_match "athar_primary_and_foreign_key_types", content
     end
 
     test "--update emits create_function for new mask built-ins and bumps athar_capture_delete to v2" do
