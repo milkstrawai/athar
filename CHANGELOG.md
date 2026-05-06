@@ -6,6 +6,12 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-06
+
+### Fixed
+
+- Fixed `athar:install --update` migrations to replace SQL functions without dropping them, avoiding PostgreSQL dependency errors when existing triggers depend on `athar_capture_delete()`.
+
 ## [0.2.0] - 2026-05-05
 
 ### Added
