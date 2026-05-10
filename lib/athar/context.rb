@@ -39,7 +39,7 @@ module Athar
             block.call
           ensure
             MetadataStack.pop
-            apply_meta(previous_merged)
+            apply_meta(previous_merged) if connection.transaction_open?
           end
         end
       end
@@ -62,7 +62,7 @@ module Athar
           begin
             block.call
           ensure
-            restore_disabled_setting(previous)
+            restore_disabled_setting(previous) if connection.transaction_open?
           end
         end
       end

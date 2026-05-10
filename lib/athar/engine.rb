@@ -10,6 +10,10 @@ module Athar
       Athar.configuration.logger ||= Rails.logger
     end
 
+    initializer "athar.middleware" do |app|
+      app.middleware.use MetadataStackMiddleware
+    end
+
     initializer "athar.assets" do |app|
       if app.config.respond_to?(:assets)
         app.config.assets.paths << root.join("app/assets/stylesheets").to_s
@@ -22,6 +26,18 @@ module Athar
       end
 
       app.middleware.insert_after Rack::Runtime, Athar::Middleware::AssetServer, root
+    end
+  end
+
+  class MetadataStackMiddleware
+    def initialize(app)
+      @app = app
+    end
+
+    def call(env)
+      @app.call(env)
+    ensure
+      MetadataStack.clear!
     end
   end
 end

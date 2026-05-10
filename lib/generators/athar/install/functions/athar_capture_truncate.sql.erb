@@ -14,8 +14,8 @@ DECLARE
   meta_text text;
   actor_id_text text;
 BEGIN
-  arg_schema_name := NULLIF(TG_ARGV[0], 'null');
-  arg_table_name := NULLIF(TG_ARGV[1], 'null');
+  arg_schema_name := NULLIF(TG_ARGV[0], '__athar_none__');
+  arg_table_name := NULLIF(TG_ARGV[1], '__athar_none__');
 
   meta := '{}'::jsonb;
   meta_text := current_setting('athar.meta', true);

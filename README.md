@@ -256,7 +256,7 @@ The names `email`, `partial`, and `hash` are reserved and cannot be used by cust
 - `--schema=reporting` (override schema; inferred from schema-qualified model table names, otherwise `public`)
 - `--track-truncate` (also install a statement-level `AFTER TRUNCATE` trigger)
 - `--update` (drop and recreate the trigger with new arguments)
-- `--remove` (drop the trigger)
+- `--remove` (drop the trigger; works even if the model no longer exists)
 - `--fx` / `--no-fx` (force Fx-backed or raw-SQL migrations; default is Fx when available)
 
 > [!WARNING]
@@ -321,6 +321,14 @@ deletion.metadata
 deletion.actor
 ```
 
+Batch pre-load actors to avoid N+1 queries:
+
+```ruby
+deletions = Athar::Deletion.where(table_name: "users").limit(100)
+Athar::Deletion.for_records(deletions)
+deletions.each { |d| puts d.actor.name }  # no extra queries
+```
+
 Athar does not define `belongs_to :record`. The deleted row is gone, so the audit row is the source of truth.
 
 ### TRUNCATE Events
@@ -344,6 +352,9 @@ Athar.configure do |config|
   config.retention.batch_size = 1_000
   config.retention.max_batches_per_run = 100
   config.retention.queue_name = :athar
+
+  # Override the default PostgreSQL schema used when a model has no schema prefix
+  config.default_schema = "myapp"  # default is "public"
 end
 ```
 
@@ -544,6 +555,18 @@ The function was dropped after the trigger was installed (or `bin/rails generate
 ### "athar_mask_partial: head and tail must be non-negative"
 
 A trigger was hand-edited or constructed with negative `partial` arguments. The generator validates this at scaffold time, so the runtime check only fires for triggers that bypassed the generator.
+
+### Generator errors
+
+All generator errors raise `Athar::GeneratorError`:
+
+```ruby
+begin
+  Rails::Generators.invoke("athar:model", ["NonExistent"])
+rescue Athar::GeneratorError => e
+  puts e.message
+end
+```
 
 ## Development
 

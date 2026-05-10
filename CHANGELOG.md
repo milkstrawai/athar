@@ -39,6 +39,32 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - Read-only deletion-audit dashboard mounted at the engine root. Renders sidebar of tracked models, KPI strip, filter bar, paginated unified feed of `athar_deletions` and `athar_table_events`, and expandable detail. Tracked models are discovered at runtime from `pg_trigger`; no registry table. Self-contained CSS and JS under `app/assets/`, served through the host's asset pipeline (Sprockets or Propshaft) when available or by a built-in `Rack::Static` middleware otherwise; no `turbo-rails`, `stimulus-rails`, or `importmap-rails` required. Document the mount pattern and route-constraint auth in the README.
 
+### Fixed
+
+- `athar:model --remove` no longer crashes with `NameError` when the model class no longer exists.
+- `MetadataStack.clear!` is now called automatically after every Rails request via `Athar::MetadataStackMiddleware`, preventing metadata stack leaks between requests.
+- `split_schema_qualified` now uses the configured `default_schema` instead of hardcoding `"public"`.
+- Disambiguated the `record_type_column` sentinel value: changed from `'null'` to `'__athar_none__'` so a column literally named `"null"` is no longer treated as absent.
+
+### Changed
+
+- Replaced all `Thor::Error` raises in generators with `Athar::GeneratorError < Athar::Error` for a consistent error taxonomy.
+- SQL identifiers in retention queries are now properly quoted via `quote_table_name` and `quote_column_name`.
+- `Retention.prune_by_count` now accepts `time_column:` and `primary_key:` keyword arguments (defaults `"deleted_at"` and `"id"`) for generic table support.
+- `Retention.prune!` refactored into smaller focused methods; all RuboCop metric disables removed.
+- `VERSION` constant is now explicitly frozen.
+
+### Performance
+
+- `MetadataStack.current` optimized from O(n²) to O(1) via a cached merge that invalidates on `pop`/`clear!`.
+- `ActorLookup#actor` is now memoized per-instance; added `ActorLookup.for_records` for batch actor pre-loading.
+- `Deletion.for_record` caches `constantize` lookups in a thread-safe `Mutex`-guarded cache.
+- SQL trigger `athar_capture_delete` now skips `to_jsonb(OLD)` in identity mode, extracting only the primary key (and STI column if needed) directly.
+
+### Security
+
+- Context `SET_LOCAL` restore in `with_metadata` and `without_capture` ensure blocks is now guarded with `connection.transaction_open?`, preventing errors when the transaction has already rolled back.
+
 ## [0.2.1] - 2026-05-06
 
 ### Fixed

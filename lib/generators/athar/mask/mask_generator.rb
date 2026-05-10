@@ -185,7 +185,7 @@ module Athar
       end
 
       def raise_invalid(message)
-        raise ::Thor::Error, "Athar mask generator error: #{message}"
+        raise Athar::GeneratorError, "Athar mask generator error: #{message}"
       end
     end
   end

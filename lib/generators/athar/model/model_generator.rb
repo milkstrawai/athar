@@ -171,8 +171,16 @@ module Athar
         end
 
         def schema_and_table_name
-          full = model_class.table_name.to_s
-          @schema_and_table_name ||= full.include?(".") ? full.split(".", 2) : [nil, full]
+          @schema_and_table_name ||= begin
+            full = remove? ? infer_table_name : model_class.table_name.to_s
+            full.include?(".") ? full.split(".", 2) : [nil, full]
+          end
+        end
+
+        def infer_table_name
+          name.classify.constantize.table_name.to_s
+        rescue NameError
+          name.tableize
         end
 
         def record_type
@@ -214,7 +222,7 @@ module Athar
 
         def record_type_column_arg
           rtc = record_type_column
-          rtc ? "'#{rtc}'" : "'null'"
+          rtc ? "'#{rtc}'" : "'__athar_none__'"
         end
 
         def capture_mode
@@ -232,11 +240,11 @@ module Athar
         end
 
         def columns_arg
-          capture_mode == "only" ? "'{#{columns.join(",")}}'" : "'null'"
+          capture_mode == "only" ? "'{#{columns.join(",")}}'" : "'__athar_none__'"
         end
 
         def masks_arg
-          return "'null'" if mask_specs.empty?
+          return "'__athar_none__'" if mask_specs.empty?
 
           literals = mask_specs.map do |spec|
             pieces = [spec[:column], spec[:mask], *spec[:args]]
@@ -314,9 +322,9 @@ module Athar
       end
 
       def validate_identifiers!
-        validate_safe_identifier!("schema", schema_name)
         return if remove?
 
+        validate_safe_identifier!("schema", schema_name)
         validate_safe_identifier!("table", table_name)
         validate_safe_identifier!("primary_key", primary_key)
         validate_safe_class_name!("record_type", record_type)
@@ -324,9 +332,6 @@ module Athar
         rtc_override = options[:record_type_column]
         return if rtc_override.nil? || rtc_override.to_s == "false"
 
-        # Validate shape before record_type_column tries to look it up against
-        # the model's columns; otherwise an unsafe value would surface as a
-        # confusing "not found" error.
         validate_safe_identifier!("record_type_column", rtc_override)
       end
 
@@ -449,7 +454,7 @@ module Athar
       end
 
       def raise_invalid(message)
-        raise ::Thor::Error, "Athar generator error: #{message}"
+        raise Athar::GeneratorError, "Athar generator error: #{message}"
       end
     end
   end

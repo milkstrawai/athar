@@ -123,5 +123,23 @@ module Athar
 
       assert_nil deletion.actor
     end
+
+    test "for_record with class avoids constantize" do
+      user = User.create!(email: "class@example.com")
+      user.destroy!
+
+      # Passing the class directly should work without calling constantize
+      assert_equal 1, Deletion.for_record(User, user.id).count
+    end
+
+    test "for_record with string caches constantize" do
+      user = User.create!(email: "string@example.com")
+      user.destroy!
+
+      # First call populates cache
+      Deletion.for_record("User", user.id)
+      # Second call should hit cache
+      assert_equal 1, Deletion.for_record("User", user.id).count
+    end
   end
 end

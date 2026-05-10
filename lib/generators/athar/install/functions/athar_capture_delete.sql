@@ -1,14 +1,14 @@
 -- Athar capture delete trigger function (v1).
 -- Args:
---   TG_ARGV[0] record_type        (e.g. 'User') or 'null'
+--   TG_ARGV[0] record_type        (e.g. 'User') or '__athar_none__'
 --   TG_ARGV[1] schema_name        (e.g. 'public')
 --   TG_ARGV[2] table_name         (e.g. 'users')
 --   TG_ARGV[3] primary_key        (e.g. 'id')
 --   TG_ARGV[4] id_type            ('bigint' | 'integer' | 'uuid')
---   TG_ARGV[5] record_type_column ('type' | 'null')
+--   TG_ARGV[5] record_type_column ('type' | '__athar_none__')
 --   TG_ARGV[6] capture_mode       ('identity' | 'only' | 'snapshot')
---   TG_ARGV[7] columns            ('{email,name}' or 'null')
---   TG_ARGV[8] masks              ('{"col:mask_name[:arg1:arg2]"}' or 'null')
+--   TG_ARGV[7] columns            ('{email,name}' or '__athar_none__')
+--   TG_ARGV[8] masks              ('{"col:mask_name[:arg1:arg2]"}' or '__athar_none__')
 
 CREATE OR REPLACE FUNCTION athar_capture_delete()
 RETURNS trigger AS $$
@@ -32,17 +32,20 @@ DECLARE
   computed_actor_type text;
   computed_actor_id text;
 BEGIN
-  arg_record_type := NULLIF(TG_ARGV[0], 'null');
-  arg_schema_name := NULLIF(TG_ARGV[1], 'null');
-  arg_table_name := NULLIF(TG_ARGV[2], 'null');
-  arg_primary_key := NULLIF(TG_ARGV[3], 'null');
-  arg_id_type := NULLIF(TG_ARGV[4], 'null');
-  arg_record_type_column := NULLIF(TG_ARGV[5], 'null');
-  arg_capture_mode := NULLIF(TG_ARGV[6], 'null');
-  arg_columns := NULLIF(TG_ARGV[7], 'null')::text[];
-  arg_masks := NULLIF(TG_ARGV[8], 'null')::text[];
+  arg_record_type := NULLIF(TG_ARGV[0], '__athar_none__');
+  arg_schema_name := NULLIF(TG_ARGV[1], '__athar_none__');
+  arg_table_name := NULLIF(TG_ARGV[2], '__athar_none__');
+  arg_primary_key := NULLIF(TG_ARGV[3], '__athar_none__');
+  arg_id_type := NULLIF(TG_ARGV[4], '__athar_none__');
+  arg_record_type_column := NULLIF(TG_ARGV[5], '__athar_none__');
+  arg_capture_mode := NULLIF(TG_ARGV[6], '__athar_none__');
+  arg_columns := NULLIF(TG_ARGV[7], '__athar_none__')::text[];
+  arg_masks := NULLIF(TG_ARGV[8], '__athar_none__')::text[];
 
-  full_row := to_jsonb(OLD);
+  -- Only serialize the full row when needed (snapshot/only modes or record_type_column lookup)
+  IF arg_record_type_column IS NOT NULL OR arg_capture_mode <> 'identity' THEN
+    full_row := to_jsonb(OLD);
+  END IF;
 
   computed_record_type := arg_record_type;
   IF arg_record_type_column IS NOT NULL AND full_row ? arg_record_type_column THEN
@@ -71,7 +74,11 @@ BEGIN
     meta := meta_text::jsonb;
   END IF;
 
-  computed_record_id := full_row ->> arg_primary_key;
+  IF full_row IS NOT NULL THEN
+    computed_record_id := full_row ->> arg_primary_key;
+  ELSE
+    EXECUTE format('SELECT ($1).%I::text', arg_primary_key) USING OLD INTO computed_record_id;
+  END IF;
   computed_actor_type := meta ->> 'actor_type';
   computed_actor_id := meta ->> 'actor_id';
 
