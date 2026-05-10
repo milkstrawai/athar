@@ -1,0 +1,95 @@
+<%# The filter bar is rendered ONCE per full page load and never participates
+    in partial swaps (its element is outside #athar-pre / #athar-post). That's
+    what keeps the search input's focus / value / selection alive while the
+    user is typing. The bar's own state — active segments, the actor select's
+    selection — is reconciled from the URL after each swap by
+    updateFilterBarFromUrl in dashboard.js. %>
+<div class="filter-bar">
+  <form data-athar-partial-form
+        action="<%= root_path %>"
+        method="get"
+        class="filter-form"
+        role="search">
+    <%# No hidden_field_tag for other params — buildSubmitUrl in dashboard.js
+        reads the current URL's query string and overlays the form's q + actor,
+        so the form stays in sync without needing the bar to be re-rendered. %>
+
+    <div class="filter-search">
+      <%= raw icon_search %>
+      <label for="athar-search" class="sr-only">Search audit log</label>
+      <input type="search"
+             id="athar-search"
+             name="q"
+             value="<%= filters.query %>"
+             placeholder="record_id, actor, request_id, table…"
+             autocomplete="off">
+    </div>
+
+    <div class="filter-select">
+      <%# Visible "actor" text is the label — referenced via aria-labelledby
+          so screen readers don't double-announce. %>
+      <span class="seg-label" id="athar-actor-label">actor</span>
+      <select id="athar-actor"
+              name="actor"
+              aria-labelledby="athar-actor-label">
+        <option value="all" <%= "selected" if filters.actor == "all" %>>any</option>
+        <% if actors.users.any? %>
+          <optgroup label="users">
+            <% actors.users.each do |opt| %>
+              <option value="<%= opt[:value] %>" <%= "selected" if filters.actor == opt[:value] %>><%= h opt[:label] %></option>
+            <% end %>
+          </optgroup>
+        <% end %>
+        <% if actors.system.any? %>
+          <optgroup label="system">
+            <% actors.system.each do |opt| %>
+              <option value="<%= opt[:value] %>" <%= "selected" if filters.actor == opt[:value] %>><%= h opt[:label] %></option>
+            <% end %>
+          </optgroup>
+        <% end %>
+        <option value="anon" <%= "selected" if filters.actor == "anon" %>><%= h actors.anonymous_label %></option>
+      </select>
+      <%= raw icon_chev_down %>
+    </div>
+  </form>
+
+  <div class="seg" role="group" aria-label="Time filter">
+    <span class="seg-label">time</span>
+    <% [["24h", "24h"], ["7d", "7d"], ["30d", "30d"], ["all", "all"]].each do |opt, label| %>
+      <a href="<%= filter_link_url(time: opt) %>"
+         class="seg-btn <%= "is-active" if filters.time == opt %>"
+         <%= 'aria-current="page"'.html_safe if filters.time == opt %>
+         data-athar-seg="time"
+         data-athar-seg-value="<%= opt %>"
+         data-athar-partial-link><%= label %></a>
+    <% end %>
+  </div>
+
+  <div class="seg" role="group" aria-label="Capture mode filter">
+    <span class="seg-label">mode</span>
+    <% %w[all identity only snapshot].each do |opt| %>
+      <a href="<%= filter_link_url(mode: opt) %>"
+         class="seg-btn <%= "is-active" if filters.mode == opt %>"
+         <%= 'aria-current="page"'.html_safe if filters.mode == opt %>
+         data-athar-seg="mode"
+         data-athar-seg-value="<%= opt %>"
+         data-athar-partial-link><%= opt %></a>
+    <% end %>
+  </div>
+
+  <div class="seg" role="group" aria-label="Event kind filter">
+    <span class="seg-label">kind</span>
+    <% [["all", "all"], ["delete", "row deletes"], ["truncate", "truncate"]].each do |opt, label| %>
+      <a href="<%= filter_link_url(kind: opt) %>"
+         class="seg-btn <%= "is-active" if filters.kind == opt %>"
+         <%= 'aria-current="page"'.html_safe if filters.kind == opt %>
+         data-athar-seg="kind"
+         data-athar-seg-value="<%= opt %>"
+         data-athar-partial-link><%= label %></a>
+    <% end %>
+  </div>
+
+  <a class="filter-clear"
+     href="<%= root_path %>"
+     data-athar-partial-link>clear</a>
+</div>

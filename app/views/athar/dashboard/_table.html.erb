@@ -1,0 +1,30 @@
+<div class="table-wrap">
+  <table class="dtable">
+    <thead>
+      <tr>
+        <th class="th-expand"></th>
+        <th class="th-when">deleted_at</th>
+        <th>record</th>
+        <th>schema.table</th>
+        <th>capture</th>
+        <th>actor</th>
+        <th>metadata</th>
+        <th class="th-id">id</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <% rows.each do |row| %>
+        <%= render "athar/dashboard/row", row: row, expanded: expanded, registry_by_id: registry_by_id, actor_labels: actor_labels %>
+      <% end %>
+    </tbody>
+  </table>
+
+  <% if rows.empty? %>
+    <div class="table-empty">
+      <div class="empty-mark">∅</div>
+      <div class="empty-title">no audit rows match these filters</div>
+      <div class="empty-sub">athar_deletions returned 0 rows for the active query</div>
+    </div>
+  <% end %>
+</div>

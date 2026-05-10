@@ -4,7 +4,40 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
-## [Unreleased]
+## [0.3.4] - 2026-05-10
+
+### Fixed
+
+- Fixed the dashboard's filter bar (Time / Mode / Kind segments) showing the previously-selected segment as active after a click. The filter bar lives outside the partial-swap regions so the search input keeps its focus across navigations; its highlight is reconciled from `window.location.href` after each swap. That reconciliation ran before `history.pushState` updated the URL, so it always read one navigation behind. Pushing state first lets the reconciliation see the URL the user just navigated to.
+
+## [0.3.3] - 2026-05-10
+
+### Fixed
+
+- Fixed `PG::DatatypeMismatch: UNION types <pk_type> and bigint cannot be matched` when opening the dashboard on hosts where `Rails.configuration.generators.options[:active_record][:primary_key_type] = :uuid` (or `:integer`) caused the install migration to create the audit tables with a non-bigint primary key. The dashboard's UNION between `athar_deletions` and `athar_table_events` now resolves the audit `id` SQL type at runtime and types the empty UNION leg accordingly, so it composes cleanly regardless of the host's primary-key choice.
+
+### Added
+
+- `Athar.audit_connection` and `Athar.audit_db_config` module methods centralizing the connection both audit tables share. Multi-database hosts can route audit storage to a dedicated connection by calling `Athar::Deletion.connects_to(...)` in an initializer; the dashboard, retention, and generators follow automatically. The dashboard topbar now reflects the audit DB name when this routing is configured.
+- `FeedQuery` raises `ArgumentError` up-front when `athar_deletions.id` and `athar_table_events.id` resolve to different SQL types, replacing a cryptic Postgres UNION error with a clear message naming both tables and their detected types.
+
+## [0.3.2] - 2026-05-10
+
+### Fixed
+
+- Logo and favicon now resolve via the engine's own asset helper, which falls back to the bundled `Athar::Middleware::AssetServer` when the host's asset pipeline cannot locate `athar/logo.png`. The 0.3.1 fix relied on host-pipeline auto-discovery and still failed on hosts using `vite_ruby` or non-default Propshaft configurations. The middleware now also serves `.png` and `.svg` files from `app/assets/images/athar/`.
+
+## [0.3.1] - 2026-05-10
+
+### Fixed
+
+- Fixed `Propshaft::MissingAssetError` for `athar/logo.png` on hosts with a non-default asset pipeline. The engine now explicitly registers `app/assets/images` on `app.config.assets.paths` (alongside `stylesheets` and `javascripts`) and lists the logo in `assets.precompile` for Sprockets-based hosts. Auto-discovery of engine `app/assets/*` paths cannot be relied on across all host setups (e.g. apps using `vite_ruby` or custom Sprockets configuration).
+
+## [0.3.0] - 2026-05-10
+
+### Added
+
+- Read-only deletion-audit dashboard mounted at the engine root. Renders sidebar of tracked models, KPI strip, filter bar, paginated unified feed of `athar_deletions` and `athar_table_events`, and expandable detail. Tracked models are discovered at runtime from `pg_trigger`; no registry table. Self-contained CSS and JS under `app/assets/`, served through the host's asset pipeline (Sprockets or Propshaft) when available or by a built-in `Rack::Static` middleware otherwise; no `turbo-rails`, `stimulus-rails`, or `importmap-rails` required. Document the mount pattern and route-constraint auth in the README.
 
 ### Fixed
 

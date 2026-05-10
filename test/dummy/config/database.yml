@@ -10,3 +10,7 @@ default: &default
 test:
   <<: *default
   database: <%= ENV.fetch("ATHAR_DB_NAME", ENV["ATHAR_NO_FX"] == "1" ? "athar_no_fx_test" : "athar_test") %>
+
+development:
+  <<: *default
+  database: athar_development

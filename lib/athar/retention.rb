@@ -91,7 +91,7 @@ module Athar
       def prune_by_age(table, time_column, cutoff, batch_size, max_batches)
         return [0, 0] if max_batches <= 0
 
-        connection = ActiveRecord::Base.connection
+        connection = Athar.audit_connection
         sql = age_delete_sql(connection, table, time_column, cutoff, batch_size)
         batch_delete_loop(connection, sql, batch_size, max_batches)
       end
@@ -111,7 +111,7 @@ module Athar
       def prune_by_count(table, max_count, batch_config)
         return [0, 0] if batch_config.max_batches <= 0
 
-        connection = ActiveRecord::Base.connection
+        connection = Athar.audit_connection
         boundary = count_boundary(connection, table, max_count, batch_config)
         return [0, 0] unless boundary
 

@@ -16,6 +16,7 @@ require_relative "athar/context"
 require_relative "athar/deletion"
 require_relative "athar/table_event"
 require_relative "athar/retention"
+require_relative "athar/dashboard"
 
 module Athar
   class Error < StandardError; end
@@ -55,6 +56,19 @@ module Athar
 
     def without_capture(...)
       Context.without_capture(...)
+    end
+
+    # The connection both audit tables share. The install migration creates
+    # `athar_deletions` and `athar_table_events` together, and the dashboard
+    # composes them via UNION — so they must live on a single physical
+    # connection. Centralized here so multi-DB hosts can route both via
+    # `Athar::Deletion.connects_to(...)` and the gem follows automatically.
+    def audit_connection
+      Deletion.connection
+    end
+
+    def audit_db_config
+      Deletion.connection_db_config
     end
   end
 end

@@ -7,4 +7,5 @@ Rails.application.configure do
   config.action_controller.perform_caching = false if defined?(ActionController::Base)
   config.action_dispatch.show_exceptions = false if defined?(ActionDispatch)
   config.active_support.deprecation = :stderr
+  config.action_controller.allow_forgery_protection = false if defined?(ActionController::Base)
 end
