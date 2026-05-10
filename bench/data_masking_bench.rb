@@ -44,8 +44,8 @@ def install_masked_trigger(connection, capture_mode:, masks: nil)
   connection.execute("DROP TRIGGER IF EXISTS bench_trigger ON bench_rows")
   return if capture_mode == :none
 
-  columns_arg = "'null'"
-  masks_arg   = masks ? "'#{masks}'" : "'null'"
+  columns_arg = "'__athar_none__'"
+  masks_arg   = masks ? "'#{masks}'" : "'__athar_none__'"
 
   connection.execute(<<~SQL)
     CREATE TRIGGER bench_trigger
@@ -53,7 +53,7 @@ def install_masked_trigger(connection, capture_mode:, masks: nil)
     FOR EACH ROW
     WHEN (coalesce(current_setting('athar.disabled', true), '') <> 'on')
     EXECUTE PROCEDURE athar_capture_delete(
-      'BenchRow', 'public', 'bench_rows', 'id', 'bigint', 'null',
+      'BenchRow', 'public', 'bench_rows', 'id', 'bigint', '__athar_none__',
       '#{capture_mode}', #{columns_arg}, #{masks_arg}
     );
   SQL

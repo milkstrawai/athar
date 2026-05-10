@@ -205,9 +205,9 @@ module Athar
           'users',
           'id',
           'bigint',
-          'null',
+          '__athar_none__',
           'snapshot',
-          'null',
+          '__athar_none__',
           '{"email:email"}'
         );
       SQL
@@ -224,7 +224,7 @@ module Athar
       ActiveRecord::Base.connection.execute("DROP TRIGGER IF EXISTS athar_on_users_test_mask ON public.users")
     end
 
-    test "athar_capture_delete with TG_ARGV[8] = 'null' is a no-op (backward compat)" do
+    test "athar_capture_delete with TG_ARGV[8] = '__athar_none__' is a no-op (backward compat)" do
       ActiveRecord::Base.connection.execute(<<~SQL)
         DROP TRIGGER IF EXISTS athar_on_users_test_no_mask ON public.users;
         CREATE TRIGGER athar_on_users_test_no_mask
@@ -232,7 +232,7 @@ module Athar
         FOR EACH ROW
         WHEN (coalesce(current_setting('athar.disabled', true), '') <> 'on')
         EXECUTE PROCEDURE athar_capture_delete(
-          'User','public','users','id','bigint','null','snapshot','null','null'
+          'User','public','users','id','bigint','__athar_none__','snapshot','__athar_none__','__athar_none__'
         );
       SQL
       ActiveRecord::Base.connection.execute("DROP TRIGGER IF EXISTS athar_on_users ON public.users")
@@ -253,7 +253,7 @@ module Athar
         FOR EACH ROW
         WHEN (coalesce(current_setting('athar.disabled', true), '') <> 'on')
         EXECUTE PROCEDURE athar_capture_delete(
-          'User','public','users','id','bigint','null','snapshot','null'
+          'User','public','users','id','bigint','__athar_none__','snapshot','__athar_none__'
         );
       SQL
       ActiveRecord::Base.connection.execute("DROP TRIGGER IF EXISTS athar_on_users ON public.users")

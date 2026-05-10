@@ -101,7 +101,7 @@ module Athar
     test "--no-fx raises clearly when schema_format = :ruby" do
       with_schema_format(:ruby) do
         generator = Athar::Generators::InstallGenerator.new([], fx: false)
-        error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+        error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
         assert_match(/schema_format = :sql/, error.message)
       end
     end

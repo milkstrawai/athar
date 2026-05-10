@@ -140,8 +140,8 @@ module Athar
         FOR EACH ROW
         WHEN (coalesce(current_setting('athar.disabled', true), '') <> 'on')
         EXECUTE PROCEDURE athar_capture_delete(
-          'UuidPost', 'public', 'uuid_posts', 'id', 'uuid', 'null',
-          'identity', 'null', 'null'
+          'UuidPost', 'public', 'uuid_posts', 'id', 'uuid', '__athar_none__',
+          'identity', '__athar_none__', '__athar_none__'
         );
       SQL
 

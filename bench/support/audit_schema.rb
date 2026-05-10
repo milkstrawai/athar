@@ -17,7 +17,7 @@ module Bench
         connection.execute("DROP TRIGGER IF EXISTS #{trigger_name} ON #{table_name}")
         return if capture_mode == :none
 
-        columns_arg = columns ? "'{#{columns.join(",")}}'" : "'null'"
+        columns_arg = columns ? "'{#{columns.join(",")}}'" : "'__athar_none__'"
 
         connection.execute(<<~SQL)
           CREATE TRIGGER #{trigger_name}
@@ -25,7 +25,7 @@ module Bench
           FOR EACH ROW
           WHEN (coalesce(current_setting('athar.disabled', true), '') <> 'on')
           EXECUTE PROCEDURE athar_capture_delete(
-            '#{record_type}', 'public', '#{table_name}', 'id', 'bigint', 'null',
+            '#{record_type}', 'public', '#{table_name}', 'id', 'bigint', '__athar_none__',
             '#{capture_mode}', #{columns_arg}
           );
         SQL

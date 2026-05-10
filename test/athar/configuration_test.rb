@@ -49,5 +49,17 @@ module Athar
     test "logger falls back to Rails logger when present" do
       assert Athar.logger
     end
+
+    test "default_schema defaults to public" do
+      assert_equal "public", Athar.configuration.default_schema
+    end
+
+    test "default_schema is configurable" do
+      Athar.configuration.default_schema = "myapp"
+
+      assert_equal "myapp", Athar.configuration.default_schema
+    ensure
+      Athar.reset_configuration!
+    end
   end
 end

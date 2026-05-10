@@ -106,44 +106,44 @@ module Athar
     test "--no-fx raises when schema_format is not :sql" do
       with_schema_format(:ruby) do
         generator = Athar::Generators::ModelGenerator.new(["User"], fx: false)
-        error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+        error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
         assert_match(/schema_format = :sql/, error.message)
       end
     end
 
     test "rejects unsafe column names" do
       generator = Athar::Generators::ModelGenerator.new(["User"], only: ["bad name"])
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/unsafe characters/, error.message)
     end
 
     test "rejects nonexistent columns" do
       generator = Athar::Generators::ModelGenerator.new(["User"], only: ["does_not_exist"])
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/not found/, error.message)
     end
 
     test "rejects --only and --snapshot together" do
       generator = Athar::Generators::ModelGenerator.new(["User"], only: ["email"], snapshot: true)
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/mutually exclusive/, error.message)
     end
 
     test "rejects unsafe schema identifier" do
       generator = Athar::Generators::ModelGenerator.new(["User"], schema: %(public"; DROP TABLE x; --))
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/schema .* not a safe SQL identifier/, error.message)
     end
 
     test "rejects unsafe primary key identifier" do
       generator = Athar::Generators::ModelGenerator.new(["User"], primary_key: "id; DROP TABLE x")
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/primary_key .* not a safe SQL identifier/, error.message)
     end
 
     test "rejects unsafe record-type" do
       generator = Athar::Generators::ModelGenerator.new(["User"], record_type: "User'); DROP")
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/record_type .* not a safe Ruby class name/, error.message)
     end
 
@@ -185,7 +185,7 @@ module Athar
 
     test "rejects unsafe record-type-column" do
       generator = Athar::Generators::ModelGenerator.new(["User"], record_type_column: "type'); --")
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/record_type_column .* not a safe SQL identifier/, error.message)
     end
 
@@ -193,37 +193,37 @@ module Athar
 
     test "--mask without --only or --snapshot raises" do
       generator = Athar::Generators::ModelGenerator.new(["User"], mask: ["email:email"])
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/--mask requires --only or --snapshot/, error.message)
     end
 
     test "--only with --mask referencing uncaptured column raises" do
       generator = Athar::Generators::ModelGenerator.new(["User"], only: ["name"], mask: ["email:email"])
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/uncaptured column/, error.message)
     end
 
     test "--snapshot with --mask referencing nonexistent mask function raises" do
       generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["email:nonexistent"])
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/Mask :nonexistent is not installed/, error.message)
     end
 
     test "--snapshot with partial mask missing second arg raises" do
       generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["name:partial:0"])
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/partial requires exactly 2 integer args/, error.message)
     end
 
     test "--snapshot with partial mask non-numeric arg raises" do
       generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["name:partial:0:abc"])
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/partial requires exactly 2 integer args/, error.message)
     end
 
     test "raises when partial called with negative arg" do
       generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["name:partial:-1:2"])
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/partial requires exactly 2 integer args/, error.message)
     end
 
@@ -234,7 +234,7 @@ module Athar
 
       generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["name:my_custom:1:2"])
       generator.destination_root = destination_root
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/custom mask and takes no arguments/, error.message)
     end
 
@@ -264,19 +264,19 @@ module Athar
 
     test "--snapshot with email mask with argument raises" do
       generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["email:email:5"])
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/email takes no arguments/, error.message)
     end
 
     test "--snapshot with duplicate column in --mask raises" do
       generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["email:email,email:hash"])
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/Duplicate column/, error.message)
     end
 
     test "--snapshot with unsafe identifier in mask column name raises" do
       generator = Athar::Generators::ModelGenerator.new(["User"], snapshot: true, mask: ["email;DROP:email"])
-      error = assert_raises(::Thor::Error) { generator.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { generator.send(:validate_options!) }
       assert_match(/not a safe SQL identifier/, error.message)
     end
 
@@ -288,12 +288,12 @@ module Athar
       assert_match(/'{"email:email","name:partial:0:4"}'/, trigger_sql)
     end
 
-    test "--snapshot without --mask passes 'null' as masks_arg in trigger SQL" do
+    test "--snapshot without --mask passes '__athar_none__' as masks_arg in trigger SQL" do
       run_generator ["User", "--snapshot"]
 
       trigger_sql = File.read(File.join(destination_root, "db/triggers/athar_on_users_v01.sql"))
 
-      assert_match(/'null'/, trigger_sql)
+      assert_match(/'__athar_none__'/, trigger_sql)
     end
 
     private

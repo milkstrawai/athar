@@ -12,43 +12,43 @@ module Athar
 
     test "rejects reserved built-in name 'email'" do
       gen = Athar::Generators::MaskGenerator.new(["email"], regex: ".", replacement: "*")
-      error = assert_raises(::Thor::Error) { gen.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { gen.send(:validate_options!) }
       assert_match(/reserved/, error.message)
     end
 
     test "rejects reserved built-in name 'partial'" do
       gen = Athar::Generators::MaskGenerator.new(["partial"], regex: ".", replacement: "*")
-      error = assert_raises(::Thor::Error) { gen.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { gen.send(:validate_options!) }
       assert_match(/reserved/, error.message)
     end
 
     test "rejects reserved built-in name 'hash'" do
       gen = Athar::Generators::MaskGenerator.new(["hash"], regex: ".", replacement: "*")
-      error = assert_raises(::Thor::Error) { gen.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { gen.send(:validate_options!) }
       assert_match(/reserved/, error.message)
     end
 
     test "rejects unsafe identifier names" do
       gen = Athar::Generators::MaskGenerator.new(["bad name"], regex: ".", replacement: "*")
-      error = assert_raises(::Thor::Error) { gen.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { gen.send(:validate_options!) }
       assert_match(/not a safe SQL identifier/, error.message)
     end
 
     test "rejects names starting with mask_ to avoid double-prefix confusion" do
       gen = Athar::Generators::MaskGenerator.new(["mask_foo"], regex: ".", replacement: "*")
-      error = assert_raises(::Thor::Error) { gen.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { gen.send(:validate_options!) }
       assert_match(/mask_/, error.message)
     end
 
     test "requires --regex and --replacement when not removing" do
       gen = Athar::Generators::MaskGenerator.new(["my_mask"], {})
-      error = assert_raises(::Thor::Error) { gen.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { gen.send(:validate_options!) }
       assert_match(/--regex and --replacement are required/, error.message)
     end
 
     test "rejects --update combined with --remove" do
       gen = Athar::Generators::MaskGenerator.new(["my_mask"], update: true, remove: true)
-      error = assert_raises(::Thor::Error) { gen.send(:validate_options!) }
+      error = assert_raises(Athar::GeneratorError) { gen.send(:validate_options!) }
       assert_match(/mutually exclusive/, error.message)
     end
 
@@ -202,12 +202,12 @@ module Athar
           "#{dir}/db/triggers/athar_on_users_v01.sql",
           <<~SQL
             EXECUTE PROCEDURE athar_capture_delete(
-              'User','public','users','id','bigint','null','snapshot','null','{"ssn:ssn"}'
+              'User','public','users','id','bigint','__athar_none__','snapshot','__athar_none__','{"ssn:ssn"}'
             )
           SQL
         )
 
-        error = assert_raises(::Thor::Error) do # rubocop:disable Minitest/AssertRaisesCompoundBody
+        error = assert_raises(Athar::GeneratorError) do # rubocop:disable Minitest/AssertRaisesCompoundBody
           generator = Athar::Generators::MaskGenerator.new(["ssn"], remove: true)
           generator.destination_root = dir
           generator.send(:validate_options!)
