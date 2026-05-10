@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [0.3.4] - 2026-05-10
+
+### Fixed
+
+- Fixed the dashboard's filter bar (Time / Mode / Kind segments) showing the previously-selected segment as active after a click. The filter bar lives outside the partial-swap regions so the search input keeps its focus across navigations; its highlight is reconciled from `window.location.href` after each swap. That reconciliation ran before `history.pushState` updated the URL, so it always read one navigation behind. Pushing state first lets the reconciliation see the URL the user just navigated to.
+
 ## [0.3.3] - 2026-05-10
 
 ### Fixed

@@ -84,14 +84,16 @@
         if (fresh) replaceElement(region, fresh);
       });
 
-      // Filter bar isn't re-rendered — reconcile its visual state from the URL.
-      updateFilterBarFromUrl();
-
+      // Push state BEFORE reconciling the filter bar — the reconciliation
+      // reads window.location.href to decide which segment is active.
       if (options.replaceState) {
         history.replaceState({}, "", url);
       } else {
         history.pushState({}, "", url);
       }
+
+      // Filter bar isn't re-rendered — reconcile its visual state from the URL.
+      updateFilterBarFromUrl();
     } catch (error) {
       console.error("[athar] partial-nav failed, falling back to full navigation:", error);
       window.location.href = url;
