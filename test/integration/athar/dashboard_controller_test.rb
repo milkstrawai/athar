@@ -188,5 +188,56 @@ module Athar
       # but the pager must reflect current=2 regardless.
       assert_match(%r{<span class="pager-page">page <span class="mono">2</span>}, response.body)
     end
+
+    # End-to-end coverage for hosts that set
+    # `Rails.configuration.generators.options[:active_record][:primary_key_type] = :uuid`,
+    # which makes the install migration create the audit tables with uuid ids.
+    # Each kind filter is exercised so both UNION legs (live + empty placeholder)
+    # are typed consistently, regardless of the host's primary-key choice.
+    test "dashboard renders against uuid-id audit tables across kind filters" do
+      with_uuid_audit_tables do
+        deletion_id = SecureRandom.uuid
+        truncate_id = SecureRandom.uuid
+        now = Time.current
+
+        Athar::Deletion.insert_all!(
+          [
+            { id: deletion_id, record_type: "User", record_id: SecureRandom.uuid,
+              actor_type: nil, actor_id: nil,
+              schema_name: "public", table_name: "users",
+              deleted_at: now, created_at: now,
+              record_data: { email: "uuid-row@nimbus.app" }, metadata: {} }
+          ]
+        )
+
+        Athar::TableEvent.insert_all!(
+          [
+            { id: truncate_id, event_type: "truncate",
+              schema_name: "public", table_name: "sessions",
+              actor_type: nil, actor_id: nil,
+              occurred_at: now - 1.hour, created_at: now - 1.hour,
+              metadata: {} }
+          ]
+        )
+
+        get "/athar", params: { kind: "delete", time: "all" }
+
+        assert_response :success
+        assert_includes response.body, deletion_id
+        refute_includes response.body, truncate_id
+
+        get "/athar", params: { kind: "truncate", time: "all" }
+
+        assert_response :success
+        assert_includes response.body, truncate_id
+        refute_includes response.body, deletion_id
+
+        get "/athar", params: { time: "all" }
+
+        assert_response :success
+        assert_includes response.body, deletion_id
+        assert_includes response.body, truncate_id
+      end
+    end
   end
 end

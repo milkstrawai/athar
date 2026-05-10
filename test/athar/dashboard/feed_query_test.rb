@@ -47,6 +47,120 @@ module Athar
         refute_equal(all_rows.map { |r| r[:id] }, page2.map { |r| r[:id] })
       end
 
+      test "rows with identical occurred_at are returned in numeric id DESC order" do
+        # Triggers set both deleted_at and created_at to statement_timestamp(),
+        # so any bulk delete in a single statement produces audit rows with
+        # identical timestamps. The id column is the only meaningful tiebreaker
+        # — and on bigint hosts that means numeric DESC, not lexicographic
+        # (`'9' > '10'` lexicographically would interleave incorrectly).
+        reset_audit_tables!
+        now = Time.utc(2026, 5, 6, 14, 22, 0)
+
+        rows = (1..15).map do |i|
+          { record_type: "User", record_id: 1000 + i, actor_type: nil, actor_id: nil,
+            schema_name: "public", table_name: "users",
+            deleted_at: now, created_at: now,
+            record_data: {}, metadata: {} }
+        end
+        Athar::Deletion.insert_all!(rows)
+
+        ids_in_db = Athar::Deletion.order(id: :desc).pluck(:id)
+        feed_ids = FeedQuery.new(filters: filters, now: now, per_page: 50).call.map { |r| r[:id] }
+
+        assert_equal (1..15).to_a.reverse, ids_in_db, "sanity: ids should be 1..15"
+        assert_equal ids_in_db, feed_ids,
+                     "FeedQuery must order by numeric id DESC and return native types; " \
+                     "lexicographic text sort would yield [9, 8, 7, ..., 1, 15, 14, ..., 10]"
+      end
+
+      test "kind=delete unions cleanly when audit tables use uuid primary keys" do
+        with_uuid_audit_tables do
+          deletion_id = SecureRandom.uuid
+          truncate_id = SecureRandom.uuid
+          now = Time.utc(2026, 5, 6, 14, 22, 0)
+
+          Athar::Deletion.insert_all!(
+            [
+              { id: deletion_id, record_type: "User", record_id: SecureRandom.uuid,
+                actor_type: "User", actor_id: SecureRandom.uuid,
+                schema_name: "public", table_name: "users",
+                deleted_at: now, created_at: now,
+                record_data: {}, metadata: {} }
+            ]
+          )
+
+          Athar::TableEvent.insert_all!(
+            [
+              { id: truncate_id, event_type: "truncate",
+                schema_name: "public", table_name: "sessions",
+                actor_type: nil, actor_id: nil,
+                occurred_at: now - 1.hour, created_at: now - 1.hour,
+                metadata: {} }
+            ]
+          )
+
+          delete_only = FeedQuery.new(filters: filters(kind: "delete"), now: now).call
+          truncate_only = FeedQuery.new(filters: filters(kind: "truncate"), now: now).call
+          all_rows = FeedQuery.new(filters: filters, now: now).call
+          delete_total = FeedQuery.new(filters: filters(kind: "delete"), now: now).total
+          all_total = FeedQuery.new(filters: filters, now: now).total
+
+          assert_equal 1, delete_only.length
+          assert_equal deletion_id, delete_only.first[:id]
+          assert_equal "deletion", delete_only.first[:kind]
+
+          assert_equal 1, truncate_only.length
+          assert_equal truncate_id, truncate_only.first[:id]
+
+          assert_equal 2, all_rows.length
+          assert_equal [deletion_id, truncate_id].sort, all_rows.map { |r| r[:id] }.sort
+
+          assert_equal 1, delete_total
+          assert_equal 2, all_total
+        end
+      end
+
+      test "raises a clear error when audit tables have mismatched id sql_types" do
+        # Defensive guard against hand-edited or partially-migrated installs
+        # where athar_deletions and athar_table_events drifted apart.
+        connection = ActiveRecord::Base.connection
+        connection.transaction(requires_new: true) do
+          connection.execute("DROP TABLE athar_table_events CASCADE")
+          connection.execute(<<~SQL)
+            CREATE TABLE athar_table_events (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              event_type varchar NOT NULL,
+              schema_name varchar,
+              table_name varchar NOT NULL,
+              actor_type varchar,
+              actor_id uuid,
+              metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+              occurred_at timestamp NOT NULL,
+              created_at timestamp NOT NULL
+            )
+          SQL
+          Athar::TableEvent.reset_column_information
+
+          # The divergence check fires up-front in #call/#total, so even the
+          # default kind=all (no empty leg) gets a clear ArgumentError instead
+          # of a cryptic Postgres UNION error.
+          err = assert_raises(ArgumentError) { FeedQuery.new(filters: filters).call }
+          assert_match(/mismatched id sql_types/, err.message)
+          assert_match(/athar_deletions\.id=bigint/, err.message)
+          assert_match(/athar_table_events\.id=uuid/, err.message)
+
+          assert_raises(ArgumentError) { FeedQuery.new(filters: filters).total }
+          assert_raises(ArgumentError) { FeedQuery.new(filters: filters(kind: "delete")).call }
+          assert_raises(ArgumentError) { FeedQuery.new(filters: filters(kind: "delete")).total }
+          assert_raises(ArgumentError) { FeedQuery.new(filters: filters(kind: "truncate")).call }
+          assert_raises(ArgumentError) { FeedQuery.new(filters: filters(kind: "truncate")).total }
+
+          raise ActiveRecord::Rollback
+        end
+      ensure
+        Athar::TableEvent.reset_column_information
+      end
+
       test "actor_type collision: same id under different types does not bleed across" do
         Athar::Deletion.delete_all
         Athar::TableEvent.delete_all

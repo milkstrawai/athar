@@ -441,7 +441,7 @@ module Athar
                                                       "athar_mask_#{mask}"
                                                     ])
 
-        !ActiveRecord::Base.connection.select_value(sql).nil?
+        !Athar.audit_connection.select_value(sql).nil?
       rescue StandardError
         # If we can't reach the DB, fall back to false. The trigger install
         # itself will fail loudly later if the function truly doesn't exist.
