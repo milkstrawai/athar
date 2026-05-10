@@ -14,7 +14,11 @@ module Athar
       if app.config.respond_to?(:assets)
         app.config.assets.paths << root.join("app/assets/stylesheets").to_s
         app.config.assets.paths << root.join("app/assets/javascripts").to_s
-        app.config.assets.precompile += %w[athar/dashboard.js athar/dashboard.css] if defined?(::Sprockets)
+        app.config.assets.paths << root.join("app/assets/images").to_s
+
+        if defined?(::Sprockets)
+          app.config.assets.precompile += %w[athar/dashboard.js athar/dashboard.css athar/logo.png]
+        end
       end
 
       app.middleware.insert_after Rack::Runtime, Athar::Middleware::AssetServer, root

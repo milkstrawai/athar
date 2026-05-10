@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [0.3.1] - 2026-05-10
+
+### Fixed
+
+- Fixed `Propshaft::MissingAssetError` for `athar/logo.png` on hosts with a non-default asset pipeline. The engine now explicitly registers `app/assets/images` on `app.config.assets.paths` (alongside `stylesheets` and `javascripts`) and lists the logo in `assets.precompile` for Sprockets-based hosts. Auto-discovery of engine `app/assets/*` paths cannot be relied on across all host setups (e.g. apps using `vite_ruby` or custom Sprockets configuration).
+
 ## [0.3.0] - 2026-05-10
 
 ### Added
