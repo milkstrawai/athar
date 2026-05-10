@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [0.3.2] - 2026-05-10
+
+### Fixed
+
+- Logo and favicon now resolve via the engine's own asset helper, which falls back to the bundled `Athar::Middleware::AssetServer` when the host's asset pipeline cannot locate `athar/logo.png`. The 0.3.1 fix relied on host-pipeline auto-discovery and still failed on hosts using `vite_ruby` or non-default Propshaft configurations. The middleware now also serves `.png` and `.svg` files from `app/assets/images/athar/`.
+
 ## [0.3.1] - 2026-05-10
 
 ### Fixed
