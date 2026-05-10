@@ -1,0 +1,72 @@
+<%
+  is_open    = expanded == row[:id].to_s
+  is_trunc   = row[:kind] == "truncate"
+  row_class  = ["drow", is_open ? "is-open" : nil, is_trunc ? "is-trunc" : nil].compact.join(" ")
+  model_info = registry_by_id[[row[:schema_name], row[:table_name]]]
+  expand_url = is_open ? filter_link_url(expanded: nil) : filter_link_url(expanded: row[:id].to_s)
+%>
+
+<tr class="<%= row_class %>" data-id="<%= row[:id] %>">
+  <td class="td-expand">
+    <a href="<%= expand_url %>"
+       data-athar-partial-link
+       aria-label="<%= is_open ? "Collapse row" : "Expand row" %>"
+       aria-expanded="<%= is_open %>"
+       <%= "data-collapse-expand" if is_open %>>
+      <%= raw(is_open ? icon_chev_down : icon_chev_right) %>
+    </a>
+  </td>
+
+  <td class="td-when">
+    <div class="when-rel"><%= relative_time(row[:occurred_at]) %></div>
+    <div class="when-abs"><%= absolute_time(row[:occurred_at]) %></div>
+  </td>
+
+  <td>
+    <%= kind_icon(row[:kind]) %>
+    <span class="record-type"><%= row[:record_type] || row[:table_name] %></span>
+
+    <% if row[:record_id].present? %>
+      <span class="record-id-cell">
+        <span class="record-id">#<%= row[:record_id] %></span>
+        <%= copy_button(row[:record_id], label: "record_id") %>
+      </span>
+    <% end %>
+  </td>
+
+  <td class="mono dim"><%= row[:schema_name] %>.<%= row[:table_name] %></td>
+
+  <td>
+    <% if model_info %>
+      <%= mode_pill(model_info.capture_mode) %>
+      <%= mask_pill(model_info.masks) %>
+    <% end %>
+  </td>
+
+  <td>
+    <span class="actor actor-<%= actor_role(row) %>">
+      <span class="actor-dot"></span>
+      <span class="actor-name"><%= actor_labels[[row[:actor_type], row[:actor_id]]] || actor_label(row) %></span>
+
+      <% if row[:actor_id].present? %>
+        <%= copy_button("#{row[:actor_type]}##{row[:actor_id]}", label: "actor_id") %>
+      <% end %>
+    </span>
+  </td>
+
+  <td class="td-summary"><%= metadata_preview(row[:metadata]) %></td>
+
+  <td class="td-id mono"><%= row[:id] %></td>
+</tr>
+
+<% if is_open %>
+  <tr class="drow-detail">
+    <td colspan="8">
+      <% if row[:kind] == "deletion" %>
+        <%= render "athar/deletions/detail", deletion: deletion_for(row), registry_by_id: registry_by_id %>
+      <% else %>
+        <%= render "athar/table_events/detail", event: table_event_for(row) %>
+      <% end %>
+    </td>
+  </tr>
+<% end %>

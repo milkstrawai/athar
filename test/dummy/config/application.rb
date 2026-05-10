@@ -7,6 +7,7 @@ require "active_model/railtie"
 require "active_record/railtie"
 require "active_job/railtie"
 require "action_controller/railtie"
+require "action_view/railtie"
 
 Bundler.require(*Rails.groups)
 require "fx"

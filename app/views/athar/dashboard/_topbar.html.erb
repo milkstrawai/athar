@@ -1,0 +1,30 @@
+<header class="topbar">
+  <div class="crumbs">
+    <span class="crumb">athar</span><span class="crumb-sep">/</span><span class="crumb">deletions</span><%
+    if model %>
+      <span class="crumb-sep">/</span>
+      <span class="crumb crumb-active"><%= h model.record_type %></span>
+      <span class="crumb-meta mono"><%= model.schema %>.<%= model.table %></span>
+      <%= mode_pill(model.capture_mode) %>
+      <% if model.masks.present? %>
+        <%= mask_pill(model.masks) %>
+      <% end %>
+      <% if model.truncate %>
+        <span class="pill subtle">+ truncate</span>
+      <% end %>
+    <% else %>
+      <span class="crumb-meta">all tracked tables</span>
+    <% end %>
+  </div>
+
+  <div class="topbar-right">
+    <% theme = cookies[:athar_theme] || "dark" %>
+    <button class="theme-btn" type="button" title="Toggle theme" data-athar-theme-toggle><%= theme == "dark" ? "◐" : "◑" %></button>
+    <span class="conn-pill">
+      <span class="conn-dot"></span>
+      <span><%= connection.database %></span>
+      <span class="dim mono"><%= connection.version %></span>
+    </span>
+    <span class="time-pill mono"><%= absolute_time(now) %></span>
+  </div>
+</header>

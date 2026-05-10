@@ -37,6 +37,7 @@ It does not turn deleted rows into queryable models, and it does not provide ful
 - [Configuration](#configuration)
 - [How It Works](#how-it-works)
 - [Operational Notes](#operational-notes)
+- [Dashboard](#dashboard)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -462,6 +463,61 @@ The tasks start the local `postgres:18` Docker Compose service when needed, crea
 
 Results are machine-dependent. The scripts are intentionally not part of CI; they exist so maintainers can spot large regressions. See [`bench/RESULTS.md`](bench/RESULTS.md) for the last measured baseline.
 
+## Dashboard
+
+Athar ships a read-only audit dashboard as a Rails engine. It provides a browser interface for the data that Athar's triggers write to `athar_deletions` and `athar_table_events`.
+
+![Athar dashboard](docs/screenshots/dashboard.png)
+
+### Mounting
+
+Add the engine to your host app's `config/routes.rb`:
+
+```ruby
+mount Athar::Engine => "/athar"
+```
+
+### Authentication
+
+The engine has no built-in authentication and inherits from the host's `::ApplicationController`, so any `before_action`-based auth (session checks, policy gates) carries through automatically.
+
+For Devise-protected apps, wrap the mount in a route constraint:
+
+```ruby
+authenticate :user, ->(u) { u.admin? } do
+  mount Athar::Engine => "/athar"
+end
+```
+
+Any controller-level authentication strategy that works for your host app works here.
+
+### Dependencies
+
+Athar's only runtime dependencies are `activejob`, `activerecord`, `activesupport`, `railties`, and `fx`. The dashboard ships its own CSS and JS files, so `turbo-rails`, `stimulus-rails`, and `importmap-rails` are not required. The host's asset pipeline (Sprockets or Propshaft) serves those files when one is available; otherwise they're served by a `Rack::Static`-backed middleware bundled with the gem. Hosts that already use Hotwire are unaffected: the engine has its own layout, and dashboard pages set `<meta name="turbo-visit-control" content="reload">` so any Turbo Drive in the host falls back to a full page load when entering `/athar`.
+
+### What the dashboard shows
+
+- **Sidebar** — tracked models grouped by schema, with capture mode, masks, STI flag, truncate flag, and per-model audit row count. Discovered at runtime from `pg_trigger`; no registry table.
+- **KPI strip** — filtered row count, last 24 h, last 7 d with vs-prior delta, truncate event count, distinct actor count, and a 14-day sparkline.
+- **Filter bar** — full-text search across record/actor/metadata/data; time, mode, and kind segments; actor dropdown; clear.
+- **Unified feed** — paginated list of `athar_deletions` and truncate events from `athar_table_events`. Each row expands inline to show `record_data`, metadata, identity fields, and a requery snippet in both Ruby and SQL.
+- **Permalinks** — individual deletion at `/athar/deletions/:id`; individual table event at `/athar/table_events/:id`.
+
+### What it does not do
+
+The dashboard is read-only. There is no retention or configuration UI, no manual actions, no export, and no live updates (no polling, no Turbo Streams).
+
+### Privacy
+
+`record_data` is rendered as stored. Masking happens at trigger time, not at render time. The dashboard inherits whatever masking the host configured when the trigger was installed.
+
+> [!IMPORTANT]
+> If a trigger was installed without masking, the dashboard renders the raw values. Mask at the trigger level before sensitive data is written to `athar_deletions`.
+
+### Performance
+
+The index renders approximately 8–10 queries. Sidebar model counts and the actor dropdown query scale with audit-table size. Search uses `ILIKE` scans bounded by the active time filter. For very large audit tables, prefer narrower time windows when searching.
+
 ## Troubleshooting
 
 ### "Function `athar_capture_delete` does not exist"
@@ -500,6 +556,10 @@ mise run test
 The test task installs missing gems for the pinned Ruby, starts PostgreSQL 18 when needed, creates the needed test databases, and runs both the Fx-backed and raw-SQL test suites. The raw commands are still ordinary Bundler/Rake commands if you do not use mise.
 
 The dummy app under `test/dummy` is a real Rails app. By default it uses `schema.rb` + Fx; `ATHAR_NO_FX=1` flips it to `structure.sql` and the raw-SQL generator path. Tests use real triggers against a real database in both modes.
+
+### Dashboard assets
+
+The dashboard's CSS and JS are in `app/assets/stylesheets/athar/dashboard.css` and `app/assets/javascripts/athar/dashboard.js`. There's no build step: edit the file and reload the browser. The JS is a single IIFE that handles every dashboard interaction via delegated event listeners on `document`, including the partial-fetch swaps that keep `#athar-dashboard` in sync with the URL. `Athar::Middleware::AssetServer` serves the files at `/athar-assets/<gem-version>/dashboard.{js,css}` for hosts without an asset pipeline; everyone else gets digested URLs from Sprockets or Propshaft.
 
 ## Contributing
 

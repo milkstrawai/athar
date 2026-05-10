@@ -1,0 +1,80 @@
+<div class="detail">
+  <div class="detail-grid">
+
+    <%# Section 1: metadata %>
+    <section class="detail-section">
+      <header class="detail-h">
+        <span>metadata</span>
+      </header>
+
+      <%= render_json_kv(event.metadata) %>
+    </section>
+
+    <%# Section 2: identity (wide) %>
+    <section class="detail-section detail-wide">
+      <header class="detail-h">
+        <span>identity</span>
+      </header>
+      <table class="kv-table">
+        <tbody>
+          <tr>
+            <td class="kv-key">athar_table_events.id</td>
+            <td class="kv-val mono">
+              <%= event.id %>
+              <%= copy_button(event.id.to_s, label: "audit id") %>
+            </td>
+          </tr>
+          <tr>
+            <td class="kv-key">event_type</td>
+            <td class="kv-val"><%= event.event_type %></td>
+          </tr>
+          <tr>
+            <td class="kv-key">schema · table</td>
+            <td class="kv-val mono"><%= event.schema_name %>.<%= event.table_name %></td>
+          </tr>
+          <tr>
+            <td class="kv-key">occurred_at</td>
+            <td class="kv-val mono"><%= absolute_time(event.occurred_at) %></td>
+          </tr>
+          <tr>
+            <td class="kv-key">actor</td>
+            <td class="kv-val">
+              <% if event.actor_id.present? %>
+                <span class="mono"><%= event.actor_type %>#<%= event.actor_id %></span>
+                ·
+                <% actor_record = event.actor %>
+                <%= h Athar::Dashboard::ActorLabels.humanize(actor_record, event.actor_type, event.actor_id) %>
+                <%= copy_button("#{event.actor_type}##{event.actor_id}", label: "actor") %>
+              <% elsif event.metadata.is_a?(Hash) && event.metadata["actor"] %>
+                <span class="mono muted">
+                  <%= ERB::Util.html_escape(event.metadata["actor"]) %>
+                  <span class="pill subtle">metadata</span>
+                </span>
+              <% else %>
+                <span class="muted">(none)</span>
+              <% end %>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <%# Section 3: requery (wide) %>
+    <% ruby_snippet = "Athar::TableEvent.find(#{event.id})" %>
+    <% sql_snippet  = "SELECT *\nFROM athar_table_events\nWHERE id = #{event.id};" %>
+    <section class="detail-section detail-wide">
+      <header class="detail-h">
+        <span>requery</span>
+      </header>
+      <div class="code-wrap">
+        <%= copy_button(ruby_snippet, label: "Ruby snippet") %>
+        <pre class="code"><code><%= h ruby_snippet %></code></pre>
+      </div>
+      <div class="code-wrap">
+        <%= copy_button(sql_snippet, label: "SQL snippet") %>
+        <pre class="code"><code><%= h sql_snippet %></code></pre>
+      </div>
+    </section>
+
+  </div>
+</div>

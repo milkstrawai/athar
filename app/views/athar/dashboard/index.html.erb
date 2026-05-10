@@ -1,0 +1,31 @@
+<%# Sidebar lives outside #athar-dashboard so filter changes / pagination / row
+    expand can swap only the main content via partial-fetch (anchors with
+    `data-athar-partial-link` and forms with `data-athar-partial-form`, both
+    handled by app/assets/javascripts/athar/dashboard.js).
+
+    The dashboard body is split into #athar-pre (topbar + KPI strip) and
+    #athar-post (table + pager) regions. Partial swaps replace each region
+    independently and skip the filter bar entirely — that way the search
+    input and actor select are never destroyed mid-keystroke and focus /
+    selection / value can never be lost. The filter bar's own visual state
+    (active segments, selected actor) is reconciled from the URL after each
+    swap; see updateFilterBarFromUrl in dashboard.js. %>
+<div class="app">
+  <%= render "athar/dashboard/sidebar", registry: @registry, filters: @filters %>
+
+  <main class="main">
+    <div id="athar-dashboard">
+      <div id="athar-pre">
+        <%= render "athar/dashboard/topbar", filters: @filters, model: @selected_model, connection: @connection_info, now: @now %>
+        <%= render "athar/dashboard/kpi_strip", kpis: @kpis, total: @total %>
+      </div>
+
+      <%= render "athar/dashboard/filter_bar", filters: @filters, actors: @actors %>
+
+      <div id="athar-post">
+        <%= render "athar/dashboard/table", rows: @rows, expanded: @filters.expanded, registry_by_id: @registry_by_id, filters: @filters, actor_labels: @actor_labels %>
+        <%= render "athar/dashboard/pager", page: @page %>
+      </div>
+    </div>
+  </main>
+</div>

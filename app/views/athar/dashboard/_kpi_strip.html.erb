@@ -1,0 +1,46 @@
+<%
+  pct_7d = ((kpis.last_7d - kpis.prior_7d).to_f / [kpis.prior_7d, 1].max * 100).round
+  max_bucket = [kpis.sparkline.max, 1].max
+%>
+<div class="kpi-strip">
+  <div class="kpi">
+    <div class="kpi-label">filtered rows</div>
+    <div class="kpi-value"><%= number_with_delimiter(total) %></div>
+    <div class="kpi-sub">of <%= number_with_delimiter(kpis.scope_total) %></div>
+  </div>
+
+  <div class="kpi">
+    <div class="kpi-label">last 24h</div>
+    <div class="kpi-value"><%= number_with_delimiter(kpis.last_24h) %></div>
+    <div class="kpi-sub">row deletes</div>
+  </div>
+
+  <div class="kpi">
+    <div class="kpi-label">last 7d</div>
+    <div class="kpi-value"><%= number_with_delimiter(kpis.last_7d) %></div>
+    <div class="kpi-sub">+<%= pct_7d %>% vs prior</div>
+  </div>
+
+  <div class="kpi">
+    <div class="kpi-label">truncate events</div>
+    <div class="kpi-value"><%= number_with_delimiter(kpis.truncates_30d) %></div>
+    <div class="kpi-sub">last 30d</div>
+  </div>
+
+  <div class="kpi">
+    <div class="kpi-label">distinct actors</div>
+    <div class="kpi-value"><%= number_with_delimiter(kpis.distinct_actors_30d) %></div>
+    <div class="kpi-sub">last 30d</div>
+  </div>
+
+  <div class="kpi spark-kpi">
+    <div class="kpi-label">deletions · 14d</div>
+    <div class="spark">
+      <% kpis.sparkline.each_with_index do |bucket, i| %>
+        <% bar_pct = (bucket.to_f / max_bucket * 100).round(2) %>
+        <% day_offset = kpis.sparkline.length - 1 - i %>
+        <span class="spark-bar" style="height:<%= bar_pct %>%" title="<%= bucket %> on day -<%= day_offset %>"></span>
+      <% end %>
+    </div>
+  </div>
+</div>

@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
-## [Unreleased]
+## [0.3.0] - 2026-05-10
+
+### Added
+
+- Read-only deletion-audit dashboard mounted at the engine root. Renders sidebar of tracked models, KPI strip, filter bar, paginated unified feed of `athar_deletions` and `athar_table_events`, and expandable detail. Tracked models are discovered at runtime from `pg_trigger`; no registry table. Self-contained CSS and JS under `app/assets/`, served through the host's asset pipeline (Sprockets or Propshaft) when available or by a built-in `Rack::Static` middleware otherwise; no `turbo-rails`, `stimulus-rails`, or `importmap-rails` required. Document the mount pattern and route-constraint auth in the README.
 
 ## [0.2.1] - 2026-05-06
 
