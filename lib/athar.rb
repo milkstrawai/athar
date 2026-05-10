@@ -22,6 +22,8 @@ module Athar
 
   class ConfigurationError < Error; end
 
+  class GeneratorError < Error; end
+
   class << self
     def configuration
       @configuration ||= Configuration.new
