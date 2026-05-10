@@ -16,13 +16,17 @@ module Athar
 
       MIME_TYPES = {
         ".js" => "application/javascript",
-        ".css" => "text/css"
+        ".css" => "text/css",
+        ".png" => "image/png",
+        ".svg" => "image/svg+xml"
       }.freeze
 
       # Where each file extension lives, relative to the engine root.
       EXTENSION_DIRS = {
         ".js" => "app/assets/javascripts/athar",
-        ".css" => "app/assets/stylesheets/athar"
+        ".css" => "app/assets/stylesheets/athar",
+        ".png" => "app/assets/images/athar",
+        ".svg" => "app/assets/images/athar"
       }.freeze
 
       def initialize(app, engine_root)
