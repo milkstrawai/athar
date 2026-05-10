@@ -5,13 +5,14 @@ module Athar
   TABLE_EVENTS_TABLE_NAME = "athar_table_events"
 
   class Configuration
-    attr_accessor :logger
+    attr_accessor :logger, :default_schema
 
     attr_reader :retention
 
     def initialize
-      @logger = nil
-      @retention = RetentionConfiguration.new
+      @logger         = nil
+      @default_schema = "public"
+      @retention      = RetentionConfiguration.new
     end
 
     class RetentionConfiguration

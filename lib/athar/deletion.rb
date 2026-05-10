@@ -28,7 +28,7 @@ module Athar
         else
           raise ArgumentError, "id is required when passing a record class or type" if id.nil?
 
-          klass = record_or_class.is_a?(Class) ? record_or_class : record_or_class.to_s.constantize
+          klass = record_or_class.is_a?(Class) ? record_or_class : constantize_cached(record_or_class.to_s)
           schema, table = split_schema_qualified(klass.table_name)
           where(schema_name: schema, table_name: table, record_id: id)
         end
@@ -52,9 +52,14 @@ module Athar
 
       private
 
+      def constantize_cached(str)
+        @constantize_cache ||= {}
+        @constantize_cache[str] ||= str.constantize
+      end
+
       def split_schema_qualified(qualified)
         full = qualified.to_s
-        full.include?(".") ? full.split(".", 2) : ["public", full]
+        full.include?(".") ? full.split(".", 2) : [Athar.configuration.default_schema, full]
       end
     end
   end
