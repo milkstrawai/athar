@@ -37,7 +37,8 @@ module Athar
       PG_ARRAY_BARE   = /[^,]+/
 
       class << self
-        def discover(connection = ActiveRecord::Base.connection) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/MethodLength,Metrics/PerceivedComplexity
+        def discover # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity,Metrics/MethodLength,Metrics/PerceivedComplexity
+          connection = Athar.audit_connection
           triggers = parse_delete_triggers(connection)
           truncate_keys = truncate_trigger_keys(connection)
           counts = load_counts(connection)

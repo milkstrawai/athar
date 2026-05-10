@@ -10,17 +10,17 @@ module Athar
         @cutoff = cutoff
       end
 
-      def call(connection: ActiveRecord::Base.connection)
+      def call
         Result.new(
-          users: load_users(connection),
-          system: load_system(connection),
+          users: load_users,
+          system: load_system,
           anonymous_label: "(anonymous)"
         )
       end
 
       private
 
-      def load_users(connection) # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
+      def load_users # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
         rows = connection.select_all(<<~SQL).to_a
           SELECT actor_type, actor_id::text AS actor_id, MAX(deleted_at) AS last_seen
           FROM #{Athar::DELETIONS_TABLE_NAME}
@@ -50,7 +50,7 @@ module Athar
         end
       end
 
-      def load_system(connection)
+      def load_system
         rows = connection.select_all(<<~SQL).to_a
           SELECT metadata->>'actor' AS name, MAX(deleted_at) AS last_seen
           FROM #{Athar::DELETIONS_TABLE_NAME}
@@ -64,7 +64,11 @@ module Athar
       end
 
       def quote(value)
-        ActiveRecord::Base.connection.quote(value)
+        connection.quote(value)
+      end
+
+      def connection
+        Athar.audit_connection
       end
     end
   end

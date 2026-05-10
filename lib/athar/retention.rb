@@ -60,7 +60,7 @@ module Athar
       def prune_by_age(table, time_column, cutoff, batch_size, max_batches) # rubocop:disable Metrics/MethodLength
         return [0, 0] if max_batches <= 0
 
-        connection = ActiveRecord::Base.connection
+        connection = Athar.audit_connection
         total = 0
         batches = 0
         loop do
@@ -88,7 +88,7 @@ module Athar
       def prune_by_count(table, max_count, batch_size, max_batches) # rubocop:disable Metrics/MethodLength
         return [0, 0] if max_batches <= 0
 
-        connection = ActiveRecord::Base.connection
+        connection = Athar.audit_connection
         boundary = connection.select_one(
           <<~SQL
             SELECT deleted_at, id

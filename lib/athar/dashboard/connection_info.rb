@@ -6,12 +6,9 @@ module Athar
     class ConnectionInfo
       attr_reader :database, :version
 
-      def self.fetch(
-        connection: ActiveRecord::Base.connection,
-        db_config: ActiveRecord::Base.connection_db_config
-      )
-        version_num = connection.select_value("SHOW server_version_num").to_i
-        new(database: db_config.database.to_s, version: "pg#{version_num / 10_000}")
+      def self.fetch
+        version_num = Athar.audit_connection.select_value("SHOW server_version_num").to_i
+        new(database: Athar.audit_db_config.database.to_s, version: "pg#{version_num / 10_000}")
       end
 
       def initialize(database:, version:)

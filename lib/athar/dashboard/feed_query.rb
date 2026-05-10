@@ -3,9 +3,6 @@
 module Athar
   module Dashboard
     class FeedQuery # rubocop:disable Metrics/ClassLength
-      # Typed empty SELECT used for either UNION leg when the kind filter
-      # excludes that leg. Column types must match the live SELECTs above
-      # so PostgreSQL can compose the UNION without coercion.
       DELETION_SEARCH_COLUMNS = %w[
         record_type record_id::text schema_name table_name
         actor_type actor_id::text record_data::text metadata::text
@@ -15,22 +12,6 @@ module Athar
         schema_name table_name actor_type actor_id::text metadata::text
       ].freeze
 
-      EMPTY_LEG_SELECT = <<~SQL
-        SELECT
-          NULL::text        AS kind,
-          NULL::bigint      AS id,
-          NULL::text        AS record_type,
-          NULL::text        AS record_id,
-          NULL::text        AS schema_name,
-          NULL::text        AS table_name,
-          NULL::text        AS actor_type,
-          NULL::text        AS actor_id,
-          NULL::timestamptz AS occurred_at,
-          NULL::jsonb       AS record_data,
-          NULL::jsonb       AS metadata
-        WHERE FALSE
-      SQL
-
       def initialize(filters:, per_page: 25, now: Time.current, registry: nil)
         @filters = filters
         @per_page = per_page
@@ -38,11 +19,13 @@ module Athar
         @registry = registry
       end
 
-      def call(connection: ActiveRecord::Base.connection)
+      def call
+        audit_id_type # raise early on type mismatch instead of letting Postgres bubble a cryptic error
         connection.select_all(page_sql, "FeedQuery#call").map { |row| to_row(row) }
       end
 
-      def total(connection: ActiveRecord::Base.connection)
+      def total
+        audit_id_type
         connection.select_value(count_sql, "FeedQuery#total").to_i
       end
 
@@ -67,7 +50,7 @@ module Athar
       end
 
       def deletion_select
-        return EMPTY_LEG_SELECT if filters.kind == "truncate"
+        return empty_leg_select if filters.kind == "truncate"
 
         <<~SQL
           SELECT
@@ -88,7 +71,7 @@ module Athar
       end
 
       def table_event_select
-        return EMPTY_LEG_SELECT if filters.kind == "delete"
+        return empty_leg_select if filters.kind == "delete"
 
         <<~SQL
           SELECT
@@ -108,13 +91,52 @@ module Athar
         SQL
       end
 
+      def empty_leg_select
+        <<~SQL
+          SELECT
+            NULL::text             AS kind,
+            NULL::#{audit_id_type} AS id,
+            NULL::text             AS record_type,
+            NULL::text             AS record_id,
+            NULL::text             AS schema_name,
+            NULL::text             AS table_name,
+            NULL::text             AS actor_type,
+            NULL::text             AS actor_id,
+            NULL::timestamptz      AS occurred_at,
+            NULL::jsonb            AS record_data,
+            NULL::jsonb            AS metadata
+          WHERE FALSE
+        SQL
+      end
+
+      # Native SQL type of the `id` column on both audit tables, used to type
+      # the empty UNION leg so it matches the live legs without coercion.
+      # The two tables are always created together by the install migration
+      # and share the same primary_key_type; we verify that here so a manual
+      # divergence raises a clear error rather than a cryptic UNION mismatch.
+      def audit_id_type
+        @audit_id_type ||= begin
+          deletions = connection.columns(Athar::DELETIONS_TABLE_NAME).find { |c| c.name == "id" }.sql_type
+          events = connection.columns(Athar::TABLE_EVENTS_TABLE_NAME).find { |c| c.name == "id" }.sql_type
+
+          if deletions != events
+            raise ArgumentError,
+                  "athar audit tables have mismatched id sql_types: " \
+                  "#{Athar::DELETIONS_TABLE_NAME}.id=#{deletions}, " \
+                  "#{Athar::TABLE_EVENTS_TABLE_NAME}.id=#{events}"
+          end
+
+          deletions
+        end
+      end
+
       def deletion_where_clause # rubocop:disable Metrics/AbcSize
         clauses = ["TRUE"]
         clauses << time_clause("deleted_at")
         clauses << "record_type = #{quote(filters.model)}" if filters.model
         # capture_mode is not on the audit row; mode filter operates by table.
         clauses << tables_with_mode_clause(filters.mode) if filters.mode != "all"
-        clauses << actor_clause("athar_deletions")
+        clauses << actor_clause
         clauses << search_clause(DELETION_SEARCH_COLUMNS)
         clauses.compact.join(" AND ")
       end
@@ -124,7 +146,7 @@ module Athar
         clauses << time_clause("occurred_at")
         clauses << tables_for_model_clause if filters.model
         clauses << tables_with_mode_clause(filters.mode) if filters.mode != "all"
-        clauses << actor_clause("athar_table_events")
+        clauses << actor_clause
         clauses << search_clause(TABLE_EVENT_SEARCH_COLUMNS)
         clauses.compact.join(" AND ")
       end
@@ -136,7 +158,7 @@ module Athar
         "#{column} >= #{quote(cutoff)}"
       end
 
-      def actor_clause(_table)
+      def actor_clause
         actor_filter = filters.actor_filter
         return nil unless actor_filter
 
@@ -182,13 +204,17 @@ module Athar
       end
 
       def quote(value)
-        ActiveRecord::Base.connection.quote(value)
+        connection.quote(value)
+      end
+
+      def connection
+        Athar.audit_connection
       end
 
       def to_row(hash)
         {
           kind: hash["kind"],
-          id: hash["id"].to_i,
+          id: hash["id"],
           record_type: hash["record_type"],
           record_id: hash["record_id"],
           schema_name: hash["schema_name"],

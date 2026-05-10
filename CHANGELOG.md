@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [0.3.3] - 2026-05-10
+
+### Fixed
+
+- Fixed `PG::DatatypeMismatch: UNION types <pk_type> and bigint cannot be matched` when opening the dashboard on hosts where `Rails.configuration.generators.options[:active_record][:primary_key_type] = :uuid` (or `:integer`) caused the install migration to create the audit tables with a non-bigint primary key. The dashboard's UNION between `athar_deletions` and `athar_table_events` now resolves the audit `id` SQL type at runtime and types the empty UNION leg accordingly, so it composes cleanly regardless of the host's primary-key choice.
+
+### Added
+
+- `Athar.audit_connection` and `Athar.audit_db_config` module methods centralizing the connection both audit tables share. Multi-database hosts can route audit storage to a dedicated connection by calling `Athar::Deletion.connects_to(...)` in an initializer; the dashboard, retention, and generators follow automatically. The dashboard topbar now reflects the audit DB name when this routing is configured.
+- `FeedQuery` raises `ArgumentError` up-front when `athar_deletions.id` and `athar_table_events.id` resolve to different SQL types, replacing a cryptic Postgres UNION error with a clear message naming both tables and their detected types.
+
 ## [0.3.2] - 2026-05-10
 
 ### Fixed

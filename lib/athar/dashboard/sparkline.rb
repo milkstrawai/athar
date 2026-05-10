@@ -10,7 +10,7 @@ module Athar
         @now = now
       end
 
-      def buckets(connection: ActiveRecord::Base.connection) # rubocop:disable Metrics/AbcSize
+      def buckets # rubocop:disable Metrics/AbcSize
         rows = connection.select_all(<<~SQL).to_a
           SELECT date_trunc('day', deleted_at) AS day, COUNT(*) AS n
           FROM #{Athar::DELETIONS_TABLE_NAME}
@@ -35,7 +35,11 @@ module Athar
       end
 
       def quote(value)
-        ActiveRecord::Base.connection.quote(value)
+        connection.quote(value)
+      end
+
+      def connection
+        Athar.audit_connection
       end
     end
   end

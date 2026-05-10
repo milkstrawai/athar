@@ -19,27 +19,27 @@ module Athar
         @registry = registry
       end
 
-      def call(connection: ActiveRecord::Base.connection) # rubocop:disable Metrics/AbcSize
-        aggregates = aggregate(connection)
-        truncates_30d = truncate_count(connection)
+      def call # rubocop:disable Metrics/AbcSize
+        aggregates = aggregate
+        truncates_30d = truncate_count
 
         Result.new(
           # scope_total covers the same universe the feed UNIONs over: row
           # deletions plus all table events for the model's tables (not just
           # the last 30d), so "filtered N of M" never overshoots M.
-          scope_total: aggregates["scope_total"].to_i + table_event_total(connection),
+          scope_total: aggregates["scope_total"].to_i + table_event_total,
           last_24h: aggregates["last_24h"].to_i,
           last_7d: aggregates["last_7d"].to_i,
           prior_7d: aggregates["prior_7d"].to_i,
           distinct_actors_30d: aggregates["distinct_actors_30d"].to_i,
           truncates_30d: truncates_30d,
-          sparkline: Sparkline.new(model: @model, now: @now).buckets(connection: connection)
+          sparkline: Sparkline.new(model: @model, now: @now).buckets
         )
       end
 
       private
 
-      def aggregate(connection) # rubocop:disable Metrics/AbcSize
+      def aggregate # rubocop:disable Metrics/AbcSize
         sql = <<~SQL
           SELECT
             COUNT(*) AS scope_total,
@@ -56,7 +56,7 @@ module Athar
         connection.select_one(sql)
       end
 
-      def truncate_count(connection)
+      def truncate_count
         sql = <<~SQL
           SELECT COUNT(*) AS n FROM #{Athar::TABLE_EVENTS_TABLE_NAME}
           WHERE event_type = 'truncate' AND occurred_at > #{quote(@now - 30.days)}
@@ -65,7 +65,7 @@ module Athar
         connection.select_value(sql).to_i
       end
 
-      def table_event_total(connection)
+      def table_event_total
         sql = <<~SQL
           SELECT COUNT(*) AS n FROM #{Athar::TABLE_EVENTS_TABLE_NAME}
           WHERE TRUE #{table_scope_clause}
@@ -95,7 +95,11 @@ module Athar
       end
 
       def quote(value)
-        ActiveRecord::Base.connection.quote(value)
+        connection.quote(value)
+      end
+
+      def connection
+        Athar.audit_connection
       end
     end
   end
