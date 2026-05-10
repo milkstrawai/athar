@@ -28,7 +28,7 @@ module Athar
       def ensure_raw_sql_supported!
         return if schema_format == :sql
 
-        raise ::Thor::Error,
+        raise Athar::GeneratorError,
               "Athar requires the fx gem (default) or `config.active_record.schema_format = :sql` " \
               "when using --no-fx. Either install fx or switch the host app to SQL schema dumps."
       end
