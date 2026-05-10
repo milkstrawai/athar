@@ -16,6 +16,7 @@ require_relative "athar/context"
 require_relative "athar/deletion"
 require_relative "athar/table_event"
 require_relative "athar/retention"
+require_relative "athar/dashboard"
 
 module Athar
   class Error < StandardError; end

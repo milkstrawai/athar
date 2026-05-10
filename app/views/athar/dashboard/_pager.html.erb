@@ -1,0 +1,32 @@
+<%
+  start_row = page[:total] == 0 ? 0 : (page[:current] - 1) * page[:per_page] + 1
+  end_row   = [page[:current] * page[:per_page], page[:total]].min
+  on_first  = page[:current] == 1
+  on_last   = page[:current] == page[:last]
+%>
+
+<div class="pager">
+  <span class="pager-info">
+    <span class="mono"><%= number_with_delimiter(start_row) %></span>–<span class="mono"><%= number_with_delimiter(end_row) %></span><span class="dim"> of </span><span class="mono"><%= number_with_delimiter(page[:total]) %></span>
+  </span>
+
+  <div class="pager-btns">
+    <% if on_first %>
+      <button disabled>«</button>
+      <button disabled>‹</button>
+    <% else %>
+      <a href="<%= filter_link_url(page: 1) %>" data-athar-partial-link>«</a>
+      <a href="<%= filter_link_url(page: page[:current] - 1) %>" data-athar-partial-link>‹</a>
+    <% end %>
+
+    <span class="pager-page">page <span class="mono"><%= page[:current] %></span> / <span class="mono"><%= page[:last] %></span></span>
+
+    <% if on_last %>
+      <button disabled>›</button>
+      <button disabled>»</button>
+    <% else %>
+      <a href="<%= filter_link_url(page: page[:current] + 1) %>" data-athar-partial-link>›</a>
+      <a href="<%= filter_link_url(page: page[:last]) %>" data-athar-partial-link>»</a>
+    <% end %>
+  </div>
+</div>

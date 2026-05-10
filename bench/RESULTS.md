@@ -22,6 +22,18 @@ Run the Rails single-record benchmark with:
 mise run bench:rails_single
 ```
 
+Run the data-masking overhead benchmark with:
+
+```sh
+mise run bench:data_masking
+```
+
+Run the dashboard query benchmark with:
+
+```sh
+mise run bench:dashboard
+```
+
 The mise tasks start the local Docker Compose PostgreSQL service when needed, create the throwaway benchmark database, run the benchmark, and stop only the service they started.
 
 Useful SQL benchmark knobs:
@@ -45,9 +57,24 @@ Useful Rails single-record benchmark knobs:
 - `ATHAR_SINGLE_BENCH_RUNS`: measured runs per scenario. Default: `5`.
 - `ATHAR_SINGLE_BENCH_WARMUP_RUNS`: warmup runs before measurement. Default: `1`.
 
+Useful data-masking benchmark knobs:
+
+- `ATHAR_BENCH_ROWS`: rows deleted per measured run. Default: `10000`.
+- `ATHAR_BENCH_RUNS`: measured runs per scenario. Default: `5`.
+- `ATHAR_BENCH_WARMUP_RUNS`: warmup runs before measurement. Default: `1`.
+- `ATHAR_BENCH_INSERT_BATCH_SIZE`: insert batch size used while reseeding. Default: `1000`.
+
+Useful dashboard benchmark knobs:
+
+- `ATHAR_BENCH_DELETION_ROWS`: rows seeded into `athar_deletions`. Default: `1000000`.
+- `ATHAR_BENCH_TABLE_EVENT_ROWS`: rows seeded into `athar_table_events`. Default: `5000`.
+- `ATHAR_BENCH_BATCH_SIZE`: insert batch size while seeding. Default: `10000`.
+- `ATHAR_BENCH_RESEED=1`: force a fresh seed even if the row count already matches.
+- `ATHAR_BENCH_SKIP_SEED=1`: skip seeding entirely and benchmark against existing data.
+
 ## Environment
 
-- Date: 2026-05-02
+- Date: 2026-05-10
 - Hardware: Apple Silicon, macOS 26.2, Docker
 - PostgreSQL: 18.3 (Debian 18.3-1.pgdg13+1), `postgres:18`
 - Ruby: 4.0.3
@@ -108,6 +135,50 @@ Useful Rails single-record benchmark knobs:
 | `where(id:).delete_all` identity | 2.454s | 1.227 | 2.448s | 2.288s | 2.604s |   815 |
 | `where(id:).delete_all` without_capture/call | 2.999s | 1.499 | 2.994s | 2.775s | 3.205s |   667 |
 
+## Data Masking
+
+- Rows per scenario: 10,000
+- Runs: 5
+- Warmup runs: 1
+- Audit indexes: yes
+- Capture mode: snapshot, except where noted
+
+| Scenario                  | Median | Rows/sec |   Mean |    Min |    Max |
+| ------------------------- | -----: | -------: | -----: | -----: | -----: |
+| identity (no record_data) | 0.253s |   39,528 | 0.253s | 0.244s | 0.259s |
+| snapshot no masks         | 0.258s |   38,779 | 0.260s | 0.245s | 0.282s |
+| snapshot 1 mask (email)   | 0.291s |   34,422 | 0.299s | 0.275s | 0.346s |
+| snapshot 3 masks          | 0.352s |   28,406 | 0.351s | 0.340s | 0.359s |
+
+## Dashboard Queries
+
+- Deletions seeded: 1,000,000
+- Table events seeded: 5,000
+- Audit indexes: default install set (record/actor/deleted_at/table_name + record-lookup)
+- Each query is run twice; the EXPLAIN (ANALYZE, BUFFERS) timing reported is the warm-cache run
+
+| Scenario                              | Median |
+| ------------------------------------- | -----: |
+| `FeedQuery#page` no filter (30d)      |  87 ms |
+| `FeedQuery#page` model=Comment        |  59 ms |
+| `FeedQuery#page` time=24h             |  18 ms |
+| `FeedQuery#page` time=all             | 144 ms |
+| `FeedQuery#page` actor=user:User:42   |  45 ms |
+| `FeedQuery#page` actor=anon           |  54 ms |
+| `FeedQuery#page` actor=sys:retention_job |  70 ms |
+| `FeedQuery#page` q=req_a (search)     | 528 ms |
+| `FeedQuery#page` page=100             | 101 ms |
+| `FeedQuery#total` no filter           |  43 ms |
+| `FeedQuery#total` model=Comment       |  44 ms |
+| `KpiCalculator` no model              | 399 ms |
+| `KpiCalculator` model=Comment         | 180 ms |
+| `Sparkline` no model                  |  54 ms |
+| `Sparkline` model=Comment             |  67 ms |
+| `ActorOptions` users                  |  46 ms |
+| `ActorOptions` system                 |  29 ms |
+
+Adding two extra btree indexes — `(record_type, deleted_at DESC)` and `(actor_type, actor_id, deleted_at DESC)` — cuts model-scoped and actor-scoped queries by 50–70% (KPI model=Comment 180→125 ms, ActorOptions users 46→40 ms, Sparkline model=Comment 67→24 ms, FeedQuery#total model=Comment 44→19 ms). They are not part of the default install: every additional index also slows audit *capture* on every host DELETE, and the default numbers are already sub-second per query at 1M rows. Add them yourself if your audit tables are large enough that dashboard latency outweighs the capture-path overhead.
+
 ## Reading Results
 
 - `no trigger` is PostgreSQL's plain bulk delete baseline.
@@ -121,5 +192,7 @@ Useful Rails single-record benchmark knobs:
 - Rails bulk `without_capture` scenarios run each measured action inside a matching outer transaction so they do not get a hidden transaction advantage from `Athar.without_capture`.
 - Single-record `without_capture/call` scenarios call `Athar.without_capture` once per individual operation, so those rows include per-call context overhead as well as trigger bypass behavior.
 - Single-record Rails deletes are dominated by Active Record and round-trip overhead. The benchmark creates records outside the timed section, then reports median delete time across repeated runs.
+- Data-masking scenarios all use `snapshot` capture against the same 10,000-row seed, so the only variable is the number and type of mask functions invoked per row. The `identity` row is included as a no-record_data baseline against which `snapshot no masks` measures the cost of capturing the full row without any masking.
+- Dashboard queries are measured against a synthetic 1M-row dataset with realistic distribution (mixed record types, actors, and a recency-skewed time spread). Times are warm-cache; the first cold query is typically 2–3× slower. Search performance (`q=…`) is dominated by `ILIKE` over text + JSONB columns and is the primary candidate for `pg_trgm` indexing on very large tables.
 
 Use the median as the headline number. The mean, min, and max are there to show local noise. Identity capture should be the recommended mode for high-churn tables; prefer `--only` to `--snapshot` when you must retain row attributes.

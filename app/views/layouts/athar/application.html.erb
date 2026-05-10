@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" data-theme="<%= cookies[:athar_theme] || "dark" %>">
+  <head>
+    <meta charset="utf-8">
+    <title>Athar</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="<%= form_authenticity_token %>">
+    <meta name="athar-theme-url" content="<%= theme_path %>">
+
+    <%# If the host has Turbo, force a full document load when entering /athar
+        so our JS owns the page (no double-Turbo, no leftover host listeners). %>
+    <meta name="turbo-visit-control" content="reload">
+
+    <link rel="icon" type="image/png" href="<%= asset_path("athar/logo.png") %>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <%= stylesheet_link_tag athar_asset_path("dashboard.css") %>
+    <%= javascript_include_tag athar_asset_path("dashboard.js"), defer: true, nonce: athar_csp_nonce %>
+  </head>
+
+  <body>
+    <%= yield %>
+    <%# Single ARIA live region for in-page announcements (e.g. "Copied N"). %>
+    <div id="athar-aria-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  </body>
+</html>

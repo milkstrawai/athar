@@ -1,0 +1,106 @@
+<%
+  # ----- precompute -----
+  max_count = registry.map(&:count).max || 1
+  total_all = registry.sum(&:count)
+
+  # Group by schema, order: public, billing, reporting, then any others alphabetically
+  grouped      = registry.group_by(&:schema)
+  fixed        = %w[public billing reporting]
+  extras       = (grouped.keys - fixed).sort
+  schema_order = (fixed + extras).select { |schema| grouped.key?(schema) }
+
+  grouped.each_value { |models| models.sort_by!(&:count).reverse! }
+
+  # Base params for link building — strip model/page/expanded, keep everything else
+  base_params = request.query_parameters.except(:model, :page, :expanded).except("model", "page", "expanded")
+
+  # Retention display
+  max_age       = Athar.configuration.retention.max_age
+  max_count_ret = Athar.configuration.retention.max_count
+  age_label     = compact_duration(max_age)
+  count_label   = compact_number(max_count_ret)
+%>
+
+<aside class="sidebar">
+  <%# ---- sidebar head ---- %>
+  <div class="sidebar-head">
+    <div class="kbd-row">
+      <span class="brand">
+        <%= image_tag "athar/logo.png", alt: "", class: "brand-logo" %>
+        <span class="brand-name">athar</span>
+        <span class="brand-version">v<%= Athar::VERSION %></span>
+      </span>
+    </div>
+  </div>
+
+  <%# ---- all deletions row ---- %>
+  <%# Sidebar links are plain anchors — clicks trigger a full-page reload, which
+      re-renders the sidebar's active highlight in sync with the main content.
+      In-frame interactions (filter, pager, expand) use partial-fetch instead. %>
+  <a class="sidebar-row sidebar-all <%= "is-active" if filters.model.nil? %>"
+     href="<%= root_path(base_params) %>"
+     <%= 'aria-current="page"'.html_safe if filters.model.nil? %>>
+    <span class="sidebar-row-label">
+      <span class="dot"></span>All deletions
+    </span>
+    <span class="sidebar-count"><%= number_with_delimiter(total_all) %></span>
+  </a>
+
+  <%# ---- scrollable grouped list ---- %>
+  <div class="sidebar-scroll">
+    <% schema_order.each do |schema| %>
+      <% models = grouped[schema] %>
+      <div class="sidebar-group">
+        <div class="sidebar-group-head">
+          <span><%= schema %></span>
+          <span class="sidebar-group-count"><%= models.length %></span>
+        </div>
+        <% models.each do |model| %>
+          <%
+            percent    = max_count > 0 ? (model.count.to_f / max_count * 100) : 0
+            is_active  = filters.model == model.record_type
+            row_href   = root_path(base_params.merge(model: model.record_type))
+          %>
+          <a class="sidebar-row <%= "is-active" if is_active %>"
+             href="<%= row_href %>"
+             <%= 'aria-current="page"'.html_safe if is_active %>>
+            <span class="sidebar-bar" style="width:<%= percent.round(2) %>%"></span>
+            <span class="sidebar-row-label">
+              <span class="mode-dot mode-<%= model.capture_mode %>" title="capture: <%= model.capture_mode %>"></span>
+              <span class="sidebar-model"><%= model.record_type %></span>
+              <% if model.sti %>
+                <span class="sidebar-tag">STI</span>
+              <% end %>
+              <% if model.truncate %>
+                <span class="sidebar-tag" title="TRUNCATE tracked"><%= raw icon_trunc %></span>
+              <% end %>
+              <% if model.masks.any? %>
+                <span class="sidebar-tag mask" title="masks: <%= model.masks.join(", ") %>">m<%= model.masks.length %></span>
+              <% end %>
+            </span>
+            <span class="sidebar-count"><%= number_with_delimiter(model.count) %></span>
+          </a>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <%# ---- footer ---- %>
+  <div class="sidebar-foot">
+    <div class="legend">
+      <span><i class="mode-dot mode-identity"></i> identity</span>
+      <span><i class="mode-dot mode-only"></i> only</span>
+      <span><i class="mode-dot mode-snapshot"></i> snapshot</span>
+    </div>
+    <div class="retention" title="<%= max_age || max_count_ret ? "Audit log pruning configured" : "No retention configured — Athar.configure to set max_age / max_count" %>">
+      <span class="retention-label">retention</span>
+      <span class="retention-val">
+        <% if max_age || max_count_ret %>
+          <%= [max_age ? age_label : nil, max_count_ret ? "#{count_label} rows" : nil].compact.join(" · ") %>
+        <% else %>
+          unconfigured
+        <% end %>
+      </span>
+    </div>
+  </div>
+</aside>

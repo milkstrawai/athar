@@ -1,0 +1,115 @@
+<% model_info = registry_by_id&.dig([deletion.schema_name, deletion.table_name]) %>
+
+<div class="detail">
+  <div class="detail-grid">
+
+    <%# Section 1: record_data %>
+    <section class="detail-section">
+      <header class="detail-h">
+        <span>record_data</span>
+        <% if model_info %>
+          <%= mask_pill(model_info.masks) %>
+          <%= mode_pill(model_info.capture_mode) %>
+        <% end %>
+      </header>
+      <% if deletion.record_data.blank? || deletion.record_data.empty? %>
+        <div class="json-empty">
+          <% if model_info&.capture_mode == "identity" %>
+            {} <span class="muted">— identity-only capture, no record_data</span>
+          <% else %>
+            {}
+          <% end %>
+        </div>
+      <% else %>
+        <%= render_json_kv(deletion.record_data) %>
+      <% end %>
+    </section>
+
+    <%# Section 2: metadata %>
+    <section class="detail-section">
+      <header class="detail-h">
+        <span>metadata</span>
+      </header>
+
+      <%= render_json_kv(deletion.metadata) %>
+    </section>
+
+    <%# Section 3: identity (wide) %>
+    <section class="detail-section detail-wide">
+      <header class="detail-h">
+        <span>identity</span>
+      </header>
+      <table class="kv-table">
+        <tbody>
+          <tr>
+            <td class="kv-key">athar_deletions.id</td>
+            <td class="kv-val mono">
+              <%= deletion.id %>
+              <%= copy_button(deletion.id.to_s, label: "audit id") %>
+            </td>
+          </tr>
+          <tr>
+            <td class="kv-key">record_type</td>
+            <td class="kv-val"><%= deletion.record_type %></td>
+          </tr>
+          <tr>
+            <td class="kv-key">record_id</td>
+            <td class="kv-val mono">
+              <% if deletion.record_id.present? %>
+                <%= deletion.record_id %>
+                <%= copy_button(deletion.record_id.to_s, label: "record_id") %>
+              <% else %>
+                <span class="muted">—</span>
+              <% end %>
+            </td>
+          </tr>
+          <tr>
+            <td class="kv-key">schema · table</td>
+            <td class="kv-val mono"><%= deletion.schema_name %>.<%= deletion.table_name %></td>
+          </tr>
+          <tr>
+            <td class="kv-key">deleted_at</td>
+            <td class="kv-val mono"><%= absolute_time(deletion.deleted_at) %></td>
+          </tr>
+          <tr>
+            <td class="kv-key">actor</td>
+            <td class="kv-val">
+              <% if deletion.actor_id.present? %>
+                <span class="mono"><%= deletion.actor_type %>#<%= deletion.actor_id %></span>
+                ·
+                <% actor_record = deletion.actor %>
+                <%= h Athar::Dashboard::ActorLabels.humanize(actor_record, deletion.actor_type, deletion.actor_id) %>
+                <%= copy_button("#{deletion.actor_type}##{deletion.actor_id}", label: "actor") %>
+              <% elsif deletion.metadata.is_a?(Hash) && deletion.metadata["actor"] %>
+                <span class="mono muted">
+                  <%= ERB::Util.html_escape(deletion.metadata["actor"]) %>
+                  <span class="pill subtle">metadata</span>
+                </span>
+              <% else %>
+                <span class="muted">(none)</span>
+              <% end %>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <%# Section 4: requery (wide) %>
+    <% ruby_snippet = "Athar::Deletion.for_record(#{deletion.record_type}, #{deletion.record_id}).last" %>
+    <% sql_snippet  = "SELECT *\nFROM athar_deletions\nWHERE id = #{deletion.id};" %>
+    <section class="detail-section detail-wide">
+      <header class="detail-h">
+        <span>requery</span>
+      </header>
+      <div class="code-wrap">
+        <%= copy_button(ruby_snippet, label: "Ruby snippet") %>
+        <pre class="code"><code><%= h ruby_snippet %></code></pre>
+      </div>
+      <div class="code-wrap">
+        <%= copy_button(sql_snippet, label: "SQL snippet") %>
+        <pre class="code"><code><%= h sql_snippet %></code></pre>
+      </div>
+    </section>
+
+  </div>
+</div>

@@ -21,7 +21,7 @@ Gem::Specification.new do |spec|
   spec.metadata["changelog_uri"] = "#{spec.homepage}/blob/main/CHANGELOG.md"
   spec.metadata["rubygems_mfa_required"] = "true"
 
-  spec.files = Dir.glob("{lib,exe}/**/*", File::FNM_DOTMATCH).reject { |f| File.directory?(f) } +
+  spec.files = Dir.glob("{app,config,lib,exe}/**/*", File::FNM_DOTMATCH).reject { |f| File.directory?(f) } +
                %w[CHANGELOG.md LICENSE.txt README.md]
   spec.bindir = "exe"
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
